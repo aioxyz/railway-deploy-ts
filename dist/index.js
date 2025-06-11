@@ -32100,6 +32100,8 @@ async function railwayGraphQLRequest(query, variables, caller) {
                 console.log(`Gateway Timeout (504): The Railway API timed out. Will poll for updates.`);
                 return pollForEnvironment();
             }
+        }
+        else {
             coreExports.setFailed(`Action failed with error: ${error}`);
         }
     }

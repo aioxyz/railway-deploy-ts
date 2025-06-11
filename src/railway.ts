@@ -35,6 +35,7 @@ export async function railwayGraphQLRequest(
         )
         return pollForEnvironment()
       }
+    } else {
       core.setFailed(`Action failed with error: ${error}`)
     }
   }
