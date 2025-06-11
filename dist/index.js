@@ -32085,7 +32085,7 @@ const ENDPOINT = 'https://backboard.railway.app/graphql/v2';
 const BRANCH_NAME = coreExports.getInput('branch_name') || 'feat-railway-7';
 // Optional Inputs
 coreExports.getInput('MAX_TIMEOUT');
-async function railwayGraphQLRequest(query, variables) {
+async function railwayGraphQLRequest(query, variables, caller) {
     const client = new GraphQLClient(ENDPOINT, {
         headers: {
             authorization: `Bearer ${RAILWAY_API_TOKEN}`
@@ -32095,7 +32095,13 @@ async function railwayGraphQLRequest(query, variables) {
         return await client.request({ document: query, variables });
     }
     catch (error) {
-        coreExports.setFailed(`Action failed with error: ${error}`);
+        if (caller === 'CREATE_ENVIRONMENT') {
+            if (error instanceof Error && error.message.includes('504')) {
+                console.log(`Gateway Timeout (504): The Railway API timed out. Will poll for updates.`);
+                return pollForEnvironment();
+            }
+            coreExports.setFailed(`Action failed with error: ${error}`);
+        }
     }
 }
 async function getEnvironments() {
@@ -32206,16 +32212,10 @@ async function createEnvironment(sourceEnvironmentId) {
                 sourceEnvironmentId: sourceEnvironmentId
             }
         };
-        return await railwayGraphQLRequest(query, variables);
+        return await railwayGraphQLRequest(query, variables, 'CREATE_ENVIRONMENT');
     }
     catch (error) {
-        if (error instanceof Error && error.message.includes('504')) {
-            console.log(`Gateway Timeout (504): The Railway API timed out. Will poll for updates.`);
-            return pollForEnvironment();
-        }
-        else {
-            coreExports.setFailed(`Action failed with error: ${error}`);
-        }
+        coreExports.setFailed(`Action failed with error: ${error}`);
     }
 }
 async function updateEnvironment(environmentId, serviceId, variables) {
