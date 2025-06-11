@@ -21,7 +21,7 @@ export async function railwayGraphQLRequest(
 ): Promise<any> {
   const client = new GraphQLClient(ENDPOINT, {
     headers: {
-      Authorization: `Bearer ${RAILWAY_API_TOKEN}`
+      authorization: `Bearer ${RAILWAY_API_TOKEN}`
     }
   })
   try {

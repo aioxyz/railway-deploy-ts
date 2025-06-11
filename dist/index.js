@@ -32088,7 +32088,7 @@ coreExports.getInput('MAX_TIMEOUT');
 async function railwayGraphQLRequest(query, variables) {
     const client = new GraphQLClient(ENDPOINT, {
         headers: {
-            Authorization: `Bearer ${RAILWAY_API_TOKEN}`
+            authorization: `Bearer ${RAILWAY_API_TOKEN}`
         }
     });
     try {
