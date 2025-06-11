@@ -115,6 +115,47 @@ export async function getEnvironments() {
   return await railwayGraphQLRequest(query, variables)
 }
 
+async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
+  let attemptCount = 0
+  let delay = initialDelay
+
+  const checkEnvironment = async () => {
+    attemptCount++
+    console.log(`Polling for environment (attempt ${attemptCount})...`)
+
+    const result = await getEnvironments()
+    if (!result || !result.environments || !result.environments.edges) {
+      console.log('No environments data returned.')
+      return null
+    }
+
+    const targetEnvironment = result.environments.edges.find(
+      (edge: any) => edge.node.name === DEST_ENV_NAME
+    )
+
+    if (targetEnvironment) {
+      console.log(`Environment "${DEST_ENV_NAME}" found!`)
+      return { environmentCreate: targetEnvironment.node }
+    }
+
+    if (attemptCount >= maxAttempts) {
+      console.log(
+        `Reached maximum attempts (${maxAttempts}). Environment not found.`
+      )
+      return null
+    }
+
+    console.log(
+      `Environment not found yet. Retrying in ${delay / 1000} seconds...`
+    )
+    await new Promise((resolve) => setTimeout(resolve, delay))
+    delay *= 2 // Exponential backoff
+    return checkEnvironment()
+  }
+
+  return checkEnvironment()
+}
+
 export async function createEnvironment(sourceEnvironmentId: string) {
   console.log(
     'Creating Environment... based on source environment ID:',
@@ -163,7 +204,14 @@ export async function createEnvironment(sourceEnvironmentId: string) {
     }
     return await railwayGraphQLRequest(query, variables)
   } catch (error) {
-    core.setFailed(`Action failed with error: ${error}`)
+    if (error instanceof Error && error.message.includes('504')) {
+      console.log(
+        `Gateway Timeout (504): The Railway API timed out. Will poll for updates.`
+      )
+      return pollForEnvironment()
+    } else {
+      core.setFailed(`Action failed with error: ${error}`)
+    }
   }
 }
 
