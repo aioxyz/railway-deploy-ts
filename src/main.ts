@@ -1,6 +1,20 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as core from '@actions/core'
-import { wait } from './wait.js'
+import {
+  getEnvironments,
+  createEnvironment,
+  updateEnvironmentVariablesForServices,
+  updateAllDeploymentTriggers,
+  getService,
+  redeployAllServices
+} from './railway.js'
 
+const DEST_ENV_NAME = core.getInput('DEST_ENV_NAME')
+const SRC_ENVIRONMENT_NAME = core.getInput('SRC_ENVIRONMENT_NAME')
+const SRC_ENVIRONMENT_ID = core.getInput('SRC_ENVIRONMENT_ID')
+const ENV_VARS = core.getInput('ENV_VARS')
+const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
+const IGNORE_SERVICE_REDEPLOY = core.getInput('IGNORE_SERVICE_REDEPLOY')
 /**
  * The main function for the action.
  *
@@ -8,20 +22,101 @@ import { wait } from './wait.js'
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
+    // Get Environments to check if the environment already exists
+    const response = await getEnvironments()
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
+    // Filter the response to only include the environment name we are looking to create
+    const filteredEdges = response.environments.edges.filter(
+      (edge: any) => edge.node.name === DEST_ENV_NAME
+    )
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    // If there is a match this means the environment already exists
+    if (filteredEdges.length == 1) {
+      throw new Error(
+        'Environment already exists. Please delete the environment via API or Railway Dashboard and try again.'
+      )
+    }
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    let srcEnvironmentId = SRC_ENVIRONMENT_ID
+
+    // If no source ENV_ID provided get Source Environment ID to base new PR environment from (aka use the same environment variables)
+    if (!SRC_ENVIRONMENT_ID) {
+      srcEnvironmentId = response.environments.edges.filter(
+        (edge) => edge.node.name === SRC_ENVIRONMENT_NAME
+      )[0].node.id
+    }
+
+    // Create the new Environment based on the Source Environment
+    const createdEnvironment = await createEnvironment(srcEnvironmentId)
+    console.log('Created Environment:')
+    console.dir(createdEnvironment, { depth: null })
+
+    const { id: environmentId } = createdEnvironment.environmentCreate
+
+    // Get all the Deployment Triggers
+    const deploymentTriggerIds: string[] = []
+    for (const deploymentTrigger of createdEnvironment.environmentCreate
+      .deploymentTriggers.edges) {
+      const { id: deploymentTriggerId } = deploymentTrigger.node
+      deploymentTriggerIds.push(deploymentTriggerId)
+    }
+
+    // Get all the Service Instances
+    const { serviceInstances } = createdEnvironment.environmentCreate
+
+    // Update the Environment Variables on each Service Instance
+    await updateEnvironmentVariablesForServices(
+      environmentId,
+      serviceInstances,
+      ENV_VARS
+    )
+
+    // Wait for the created environment to finish initializing
+    console.log(
+      'Waiting 15 seconds for deployment to initialize and become available'
+    )
+    await new Promise((resolve) => setTimeout(resolve, 15000)) // Wait for 15 seconds
+
+    // Set the Deployment Trigger Branch for Each Service
+    await updateAllDeploymentTriggers(deploymentTriggerIds)
+
+    const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY)
+    const servicesToRedeploy: string[] = []
+
+    // Get the names for each deployed service
+    for (const serviceInstance of createdEnvironment.environmentCreate
+      .serviceInstances.edges) {
+      const { domains } = serviceInstance.node
+      const { service } = await getService(serviceInstance.node.serviceId)
+      const { name } = service
+
+      if (!servicesToIgnore.includes(name)) {
+        servicesToRedeploy.push(serviceInstance.node.serviceId)
+      }
+
+      if (
+        (API_SERVICE_NAME && name === API_SERVICE_NAME) ||
+        name === 'app' ||
+        name === 'backend' ||
+        name === 'web'
+      ) {
+        const domainData = domains.serviceDomains?.[0]
+        if (domainData) {
+          const { domain } = domainData
+          console.log('Domain:', domain)
+          core.setOutput('service_domain', domain)
+        } else {
+          console.log('Domain data is undefined')
+          // Handle the case where serviceDomains is undefined
+        }
+      }
+    }
+
+    // Redeploy the Services
+    await redeployAllServices(environmentId, servicesToRedeploy)
   } catch (error) {
-    // Fail the workflow run if an error occurs
-    if (error instanceof Error) core.setFailed(error.message)
+    console.error('Error in API calls:', error)
+    // Handle the error, e.g., fail the action
+    core.setFailed('API calls failed')
   }
 }
