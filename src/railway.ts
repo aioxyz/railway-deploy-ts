@@ -125,6 +125,47 @@ export async function getEnvironments() {
   return await railwayGraphQLRequest(query, variables)
 }
 
+export async function getEnvironment(id: string) {
+  const query = `query environment($id: String!) {
+            environment(id: $id) {
+              id
+              name
+              createdAt
+              deploymentTriggers {
+                edges {
+                  node {
+                    id
+                    environmentId
+                    branch
+                    projectId
+                  }
+                }
+              }
+              serviceInstances {
+                edges {
+                  node {
+                    id
+                    domains {
+                      serviceDomains {
+                        domain
+                        id
+                      }
+                    }
+                    serviceId
+                  }
+                }
+              }
+            }
+        }`
+
+  const variables = {
+    id
+  }
+
+  const res = await railwayGraphQLRequest(query, variables)
+  return { environmentCreate: res.environment }
+}
+
 async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
   let attemptCount = 0
   let delay = initialDelay
@@ -145,7 +186,7 @@ async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
 
     if (targetEnvironment) {
       console.log(`Environment "${DEST_ENV_NAME}" found!`)
-      return { environmentCreate: targetEnvironment.node }
+      return getEnvironment(targetEnvironment.node.id)
     }
 
     if (attemptCount >= maxAttempts) {

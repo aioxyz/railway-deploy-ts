@@ -32144,6 +32144,44 @@ async function getEnvironments() {
     };
     return await railwayGraphQLRequest(query, variables);
 }
+async function getEnvironment(id) {
+    const query = `query environment($id: String!) {
+            environment(id: $id) {
+              id
+              name
+              createdAt
+              deploymentTriggers {
+                edges {
+                  node {
+                    id
+                    environmentId
+                    branch
+                    projectId
+                  }
+                }
+              }
+              serviceInstances {
+                edges {
+                  node {
+                    id
+                    domains {
+                      serviceDomains {
+                        domain
+                        id
+                      }
+                    }
+                    serviceId
+                  }
+                }
+              }
+            }
+        }`;
+    const variables = {
+        id
+    };
+    const res = await railwayGraphQLRequest(query, variables);
+    return { environmentCreate: res.environment };
+}
 async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
     let attemptCount = 0;
     let delay = initialDelay;
@@ -32158,7 +32196,7 @@ async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
         const targetEnvironment = result.environments.edges.find((edge) => edge.node.name === DEST_ENV_NAME$1);
         if (targetEnvironment) {
             console.log(`Environment "${DEST_ENV_NAME$1}" found!`);
-            return { environmentCreate: targetEnvironment.node };
+            return getEnvironment(targetEnvironment.node.id);
         }
         if (attemptCount >= maxAttempts) {
             console.log(`Reached maximum attempts (${maxAttempts}). Environment not found.`);
