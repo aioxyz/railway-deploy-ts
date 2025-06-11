@@ -17,7 +17,8 @@ const DEPLOYMENT_MAX_TIMEOUT = core.getInput('MAX_TIMEOUT')
 
 export async function railwayGraphQLRequest(
   query: string,
-  variables: Record<string, any>
+  variables: Record<string, any>,
+  caller?: string
 ): Promise<any> {
   const client = new GraphQLClient(ENDPOINT, {
     headers: {
@@ -27,7 +28,15 @@ export async function railwayGraphQLRequest(
   try {
     return await client.request({ document: query, variables })
   } catch (error) {
-    core.setFailed(`Action failed with error: ${error}`)
+    if (caller === 'CREATE_ENVIRONMENT') {
+      if (error instanceof Error && error.message.includes('504')) {
+        console.log(
+          `Gateway Timeout (504): The Railway API timed out. Will poll for updates.`
+        )
+        return pollForEnvironment()
+      }
+      core.setFailed(`Action failed with error: ${error}`)
+    }
   }
 }
 
@@ -202,16 +211,9 @@ export async function createEnvironment(sourceEnvironmentId: string) {
         sourceEnvironmentId: sourceEnvironmentId
       }
     }
-    return await railwayGraphQLRequest(query, variables)
+    return await railwayGraphQLRequest(query, variables, 'CREATE_ENVIRONMENT')
   } catch (error) {
-    if (error instanceof Error && error.message.includes('504')) {
-      console.log(
-        `Gateway Timeout (504): The Railway API timed out. Will poll for updates.`
-      )
-      return pollForEnvironment()
-    } else {
-      core.setFailed(`Action failed with error: ${error}`)
-    }
+    core.setFailed(`Action failed with error: ${error}`)
   }
 }
 
