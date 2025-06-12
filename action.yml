@@ -3,6 +3,11 @@ description:
   'Creates an environment with provided environment variables and deploys them
   to Railway.'
 inputs:
+  MODE:
+    description:
+      'The mode the action should run in - valid options are CREATE or DESTROY'
+    required: false
+    default: 'CREATE'
   RAILWAY_API_TOKEN: # railway token
     description: 'Railway API Token'
     required: true

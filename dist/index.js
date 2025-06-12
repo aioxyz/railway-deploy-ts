@@ -32106,6 +32106,15 @@ async function railwayGraphQLRequest(query, variables, caller) {
         }
     }
 }
+async function deleteEnvironment(id) {
+    const query = `mutation deleteEnvironment($id: String!) {
+            deleteEnvironment(id: $id)
+        }`;
+    const variables = {
+        id
+    };
+    return await railwayGraphQLRequest(query, variables);
+}
 async function getEnvironments() {
     const query = `query environments($projectId: String!) {
             environments(projectId: $projectId) {
@@ -32388,18 +32397,14 @@ async function getService(serviceId) {
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const MODE = coreExports.getInput('MODE');
 const DEST_ENV_NAME = coreExports.getInput('DEST_ENV_NAME');
 const SRC_ENVIRONMENT_NAME = coreExports.getInput('SRC_ENVIRONMENT_NAME');
 const SRC_ENVIRONMENT_ID = coreExports.getInput('SRC_ENVIRONMENT_ID');
 const ENV_VARS = coreExports.getInput('ENV_VARS');
 const API_SERVICE_NAME = coreExports.getInput('API_SERVICE_NAME');
 const IGNORE_SERVICE_REDEPLOY = coreExports.getInput('IGNORE_SERVICE_REDEPLOY');
-/**
- * The main function for the action.
- *
- * @returns Resolves when the action is complete.
- */
-async function run() {
+async function runCreate() {
     try {
         // Get Environments to check if the environment already exists
         const response = await getEnvironments();
@@ -32466,9 +32471,47 @@ async function run() {
         await redeployAllServices(environmentId, servicesToRedeploy);
     }
     catch (error) {
-        console.error('Error in API calls:', error);
+        console.error('Error in runCreate:', error);
         // Handle the error, e.g., fail the action
-        coreExports.setFailed('API calls failed');
+        coreExports.setFailed('Environment creation failed');
+    }
+}
+async function runDestroy() {
+    try {
+        const response = await getEnvironments();
+        // Filter the response to only include the environment name we are looking to create
+        const filteredEdges = response.environments.edges.filter((edge) => edge.node.name === DEST_ENV_NAME);
+        // If there is a match this means the environment already exists
+        if (filteredEdges.length == 1) {
+            const environmentId = filteredEdges[0].node.id;
+            await deleteEnvironment(environmentId);
+            console.log(`Environment with name: ${DEST_ENV_NAME} and id ${environmentId} deleted successfully`);
+        }
+        else {
+            throw new Error('Environment does not exists. Cannot delete.');
+        }
+    }
+    catch (error) {
+        console.error('Error in runDestroy:', error);
+        // Handle the error, e.g., fail the action
+        coreExports.setFailed('Environment destruction failed');
+    }
+}
+/**
+ * The main function for the action.
+ *
+ * @returns Resolves when the action is complete.
+ */
+async function run() {
+    switch (MODE) {
+        case 'CREATE':
+            runCreate();
+            break;
+        case 'DESTROY':
+            runDestroy();
+            break;
+        default:
+            coreExports.setFailed(`Invalid MODE: ${MODE}`);
     }
 }
 

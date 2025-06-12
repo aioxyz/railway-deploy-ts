@@ -41,6 +41,16 @@ export async function railwayGraphQLRequest(
   }
 }
 
+export async function deleteEnvironment(id: string) {
+  const query = `mutation deleteEnvironment($id: String!) {
+            deleteEnvironment(id: $id)
+        }`
+  const variables = {
+    id
+  }
+  return await railwayGraphQLRequest(query, variables)
+}
+
 export async function getProject() {
   const query = `query project($id: String!) {
             project(id: $id) {

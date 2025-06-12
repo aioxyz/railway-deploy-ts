@@ -6,21 +6,19 @@ import {
   updateEnvironmentVariablesForServices,
   updateAllDeploymentTriggers,
   getService,
-  redeployAllServices
+  redeployAllServices,
+  deleteEnvironment
 } from './railway.js'
 
+const MODE = core.getInput('MODE')
 const DEST_ENV_NAME = core.getInput('DEST_ENV_NAME')
 const SRC_ENVIRONMENT_NAME = core.getInput('SRC_ENVIRONMENT_NAME')
 const SRC_ENVIRONMENT_ID = core.getInput('SRC_ENVIRONMENT_ID')
 const ENV_VARS = core.getInput('ENV_VARS')
 const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
 const IGNORE_SERVICE_REDEPLOY = core.getInput('IGNORE_SERVICE_REDEPLOY')
-/**
- * The main function for the action.
- *
- * @returns Resolves when the action is complete.
- */
-export async function run(): Promise<void> {
+
+async function runCreate(): Promise<void> {
   try {
     // Get Environments to check if the environment already exists
     const response = await getEnvironments()
@@ -115,8 +113,52 @@ export async function run(): Promise<void> {
     // Redeploy the Services
     await redeployAllServices(environmentId, servicesToRedeploy)
   } catch (error) {
-    console.error('Error in API calls:', error)
+    console.error('Error in runCreate:', error)
     // Handle the error, e.g., fail the action
-    core.setFailed('API calls failed')
+    core.setFailed('Environment creation failed')
+  }
+}
+
+async function runDestroy(): Promise<void> {
+  try {
+    const response = await getEnvironments()
+
+    // Filter the response to only include the environment name we are looking to create
+    const filteredEdges = response.environments.edges.filter(
+      (edge: any) => edge.node.name === DEST_ENV_NAME
+    )
+
+    // If there is a match this means the environment already exists
+    if (filteredEdges.length == 1) {
+      const environmentId = filteredEdges[0].node.id
+      await deleteEnvironment(environmentId)
+      console.log(
+        `Environment with name: ${DEST_ENV_NAME} and id ${environmentId} deleted successfully`
+      )
+    } else {
+      throw new Error('Environment does not exists. Cannot delete.')
+    }
+  } catch (error) {
+    console.error('Error in runDestroy:', error)
+    // Handle the error, e.g., fail the action
+    core.setFailed('Environment destruction failed')
+  }
+}
+
+/**
+ * The main function for the action.
+ *
+ * @returns Resolves when the action is complete.
+ */
+export async function run(): Promise<void> {
+  switch (MODE) {
+    case 'CREATE':
+      runCreate()
+      break
+    case 'DESTROY':
+      runDestroy()
+      break
+    default:
+      core.setFailed(`Invalid MODE: ${MODE}`)
   }
 }
