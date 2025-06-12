@@ -32078,7 +32078,7 @@ const gql = (chunks, ...variables) => {
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // Railway Required Inputs
 const RAILWAY_API_TOKEN = coreExports.getInput('RAILWAY_API_TOKEN');
-const PROJECT_ID = coreExports.getInput('PROJECT_ID');
+const PROJECT_ID$1 = coreExports.getInput('PROJECT_ID');
 const DEST_ENV_NAME$1 = coreExports.getInput('DEST_ENV_NAME');
 const ENDPOINT = 'https://backboard.railway.app/graphql/v2';
 // Github Required Inputs
@@ -32149,7 +32149,7 @@ async function getEnvironments() {
             }
         }`;
     const variables = {
-        projectId: PROJECT_ID
+        projectId: PROJECT_ID$1
     };
     return await railwayGraphQLRequest(query, variables);
 }
@@ -32257,7 +32257,7 @@ async function createEnvironment(sourceEnvironmentId) {
         const variables = {
             input: {
                 name: DEST_ENV_NAME$1,
-                projectId: PROJECT_ID,
+                projectId: PROJECT_ID$1,
                 sourceEnvironmentId: sourceEnvironmentId
             }
         };
@@ -32280,7 +32280,7 @@ async function updateEnvironment(environmentId, serviceId, variables) {
         const variables = {
             input: {
                 environmentId: environmentId,
-                projectId: PROJECT_ID,
+                projectId: PROJECT_ID$1,
                 serviceId: serviceId,
                 variables: parsedVariables
             }
@@ -32399,12 +32399,17 @@ async function getService(serviceId) {
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const MODE = coreExports.getInput('MODE');
 const DEST_ENV_NAME = coreExports.getInput('DEST_ENV_NAME');
+const PROJECT_ID = coreExports.getInput('PROJECT_ID');
 const SRC_ENVIRONMENT_NAME = coreExports.getInput('SRC_ENVIRONMENT_NAME');
 const SRC_ENVIRONMENT_ID = coreExports.getInput('SRC_ENVIRONMENT_ID');
 const ENV_VARS = coreExports.getInput('ENV_VARS');
 const API_SERVICE_NAME = coreExports.getInput('API_SERVICE_NAME');
 const IGNORE_SERVICE_REDEPLOY = coreExports.getInput('IGNORE_SERVICE_REDEPLOY');
 async function runCreate() {
+    if (!SRC_ENVIRONMENT_NAME || !PROJECT_ID) {
+        console.log('SRC_ENVIRONMENT_NAME and PROJECT_ID are required when creating a new environment');
+        coreExports.setFailed('Environment creation aborted');
+    }
     try {
         // Get Environments to check if the environment already exists
         const response = await getEnvironments();

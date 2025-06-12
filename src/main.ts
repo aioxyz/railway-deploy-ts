@@ -12,6 +12,7 @@ import {
 
 const MODE = core.getInput('MODE')
 const DEST_ENV_NAME = core.getInput('DEST_ENV_NAME')
+const PROJECT_ID = core.getInput('PROJECT_ID')
 const SRC_ENVIRONMENT_NAME = core.getInput('SRC_ENVIRONMENT_NAME')
 const SRC_ENVIRONMENT_ID = core.getInput('SRC_ENVIRONMENT_ID')
 const ENV_VARS = core.getInput('ENV_VARS')
@@ -19,6 +20,12 @@ const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
 const IGNORE_SERVICE_REDEPLOY = core.getInput('IGNORE_SERVICE_REDEPLOY')
 
 async function runCreate(): Promise<void> {
+  if (!SRC_ENVIRONMENT_NAME || !PROJECT_ID) {
+    console.log(
+      'SRC_ENVIRONMENT_NAME and PROJECT_ID are required when creating a new environment'
+    )
+    core.setFailed('Environment creation aborted')
+  }
   try {
     // Get Environments to check if the environment already exists
     const response = await getEnvironments()
