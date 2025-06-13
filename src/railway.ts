@@ -33,6 +33,10 @@ export async function railwayGraphQLRequest(
         console.log(
           `Gateway Timeout (504): The Railway API timed out. Will poll for updates.`
         )
+        // Wait for the created environment to finish initializing
+        console.log(
+          'Waiting 15 seconds for environment to initialize and become available'
+        )
         return pollForEnvironment()
       }
     } else {

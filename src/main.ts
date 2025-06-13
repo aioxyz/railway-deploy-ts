@@ -76,11 +76,11 @@ async function runCreate(): Promise<void> {
       ENV_VARS
     )
 
-    // Wait for the created environment to finish initializing
-    console.log(
-      'Waiting 15 seconds for deployment to initialize and become available'
-    )
-    await new Promise((resolve) => setTimeout(resolve, 15000)) // Wait for 15 seconds
+    // // Wait for the created environment to finish initializing
+    // console.log(
+    //   'Waiting 15 seconds for deployment to initialize and become available'
+    // )
+    // await new Promise((resolve) => setTimeout(resolve, 15000)) // Wait for 15 seconds
 
     // Set the Deployment Trigger Branch for Each Service
     await updateAllDeploymentTriggers(deploymentTriggerIds)
