@@ -229,6 +229,7 @@ export async function createEnvironment(sourceEnvironmentId: string) {
           id
           name
           createdAt
+          skipInitialDeploys
           deploymentTriggers {
             edges {
               node {
@@ -260,6 +261,7 @@ export async function createEnvironment(sourceEnvironmentId: string) {
       input: {
         name: DEST_ENV_NAME,
         projectId: PROJECT_ID,
+        skipInitialDeploys: true,
         sourceEnvironmentId: sourceEnvironmentId
       }
     }
