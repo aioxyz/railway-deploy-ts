@@ -32258,6 +32258,7 @@ async function createEnvironment(sourceEnvironmentId) {
             input: {
                 name: DEST_ENV_NAME$1,
                 projectId: PROJECT_ID$1,
+                skipInitialDeploys: true,
                 sourceEnvironmentId: sourceEnvironmentId
             }
         };
