@@ -32440,7 +32440,11 @@ async function runCreate() {
             srcEnvironmentId = response.environments.edges.filter((edge) => edge.node.name === SRC_ENVIRONMENT_NAME)[0].node.id;
         }
         // Create the new Environment based on the Source Environment
-        const createdEnvironment = await createEnvironment(srcEnvironmentId);
+        let createdEnvironment = await createEnvironment(srcEnvironmentId);
+        if (!createdEnvironment) {
+            coreExports.info('Environment returned empty, polling...');
+            createdEnvironment = await pollForEnvironment();
+        }
         console.log('Created Environment:');
         console.dir(createdEnvironment, { depth: null });
         const { id: environmentId } = createdEnvironment.environmentCreate;

@@ -193,7 +193,7 @@ export async function getEnvironment(id: string) {
   return { environmentCreate: res.environment }
 }
 
-async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
+export async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
   let attemptCount = 0
   let delay = initialDelay
 

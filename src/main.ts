@@ -7,7 +7,8 @@ import {
   updateAllDeploymentTriggers,
   getService,
   deployAllServices,
-  deleteEnvironment
+  deleteEnvironment,
+  pollForEnvironment
 } from './railway.js'
 
 const MODE = core.getInput('MODE')
@@ -52,7 +53,11 @@ async function runCreate(): Promise<void> {
     }
 
     // Create the new Environment based on the Source Environment
-    const createdEnvironment = await createEnvironment(srcEnvironmentId)
+    let createdEnvironment = await createEnvironment(srcEnvironmentId)
+    if (!createdEnvironment) {
+      core.info('Environment returned empty, polling...')
+      createdEnvironment = await pollForEnvironment()
+    }
     console.log('Created Environment:')
     console.dir(createdEnvironment, { depth: null })
 
