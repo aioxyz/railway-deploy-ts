@@ -32317,17 +32317,17 @@ async function deploymentTriggerUpdate(deploymentTriggerId) {
         coreExports.setFailed(`Action failed with error: ${error}`);
     }
 }
-async function serviceInstanceRedeploy(environmentId, serviceId) {
-    console.log('Redeploying Service...');
+async function serviceInstanceDeploy(environmentId, serviceId) {
+    console.log('Deploying Service...');
     console.log('Environment ID:', environmentId);
     console.log('Service ID:', serviceId);
     try {
         const query = gql `
-      mutation serviceInstanceRedeploy(
+      mutation serviceInstanceDeploy(
         $environmentId: String!
         $serviceId: String!
       ) {
-        serviceInstanceRedeploy(
+        serviceInstanceDeploy(
           environmentId: $environmentId
           serviceId: $serviceId
         )
@@ -32373,13 +32373,13 @@ async function updateEnvironmentVariablesForServices(environmentId, serviceInsta
         console.error('An error occurred during the update:', error);
     }
 }
-async function redeployAllServices(environmentId, servicesToRedeploy) {
+async function deployAllServices(environmentId, servicesToRedeploy) {
     try {
         // Create an array of promises for redeployments
-        const redeployPromises = servicesToRedeploy.map((serviceId) => serviceInstanceRedeploy(environmentId, serviceId));
+        const redeployPromises = servicesToRedeploy.map((serviceId) => serviceInstanceDeploy(environmentId, serviceId));
         // Await all promises to complete
         await Promise.all(redeployPromises);
-        console.log('All services redeployed successfully.');
+        console.log('All services deployed successfully.');
     }
     catch (error) {
         console.error('An error occurred during redeployment:', error);
@@ -32447,7 +32447,7 @@ async function runCreate() {
         // Set the Deployment Trigger Branch for Each Service
         await updateAllDeploymentTriggers(deploymentTriggerIds);
         const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY);
-        const servicesToRedeploy = [];
+        const servicesToDeploy = [];
         // Get the names for each deployed service
         for (const serviceInstance of createdEnvironment.environmentCreate
             .serviceInstances.edges) {
@@ -32455,7 +32455,7 @@ async function runCreate() {
             const { service } = await getService(serviceInstance.node.serviceId);
             const { name } = service;
             if (!servicesToIgnore.includes(name)) {
-                servicesToRedeploy.push(serviceInstance.node.serviceId);
+                servicesToDeploy.push(serviceInstance.node.serviceId);
             }
             if ((API_SERVICE_NAME && name === API_SERVICE_NAME) ||
                 name === 'app' ||
@@ -32474,7 +32474,7 @@ async function runCreate() {
             }
         }
         // Redeploy the Services
-        await redeployAllServices(environmentId, servicesToRedeploy);
+        await deployAllServices(environmentId, servicesToDeploy);
     }
     catch (error) {
         console.error('Error in runCreate:', error);

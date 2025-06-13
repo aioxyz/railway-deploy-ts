@@ -6,7 +6,7 @@ import {
   updateEnvironmentVariablesForServices,
   updateAllDeploymentTriggers,
   getService,
-  redeployAllServices,
+  deployAllServices,
   deleteEnvironment
 } from './railway.js'
 
@@ -86,7 +86,7 @@ async function runCreate(): Promise<void> {
     await updateAllDeploymentTriggers(deploymentTriggerIds)
 
     const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY)
-    const servicesToRedeploy: string[] = []
+    const servicesToDeploy: string[] = []
 
     // Get the names for each deployed service
     for (const serviceInstance of createdEnvironment.environmentCreate
@@ -96,7 +96,7 @@ async function runCreate(): Promise<void> {
       const { name } = service
 
       if (!servicesToIgnore.includes(name)) {
-        servicesToRedeploy.push(serviceInstance.node.serviceId)
+        servicesToDeploy.push(serviceInstance.node.serviceId)
       }
 
       if (
@@ -118,7 +118,7 @@ async function runCreate(): Promise<void> {
     }
 
     // Redeploy the Services
-    await redeployAllServices(environmentId, servicesToRedeploy)
+    await deployAllServices(environmentId, servicesToDeploy)
   } catch (error) {
     console.error('Error in runCreate:', error)
     // Handle the error, e.g., fail the action

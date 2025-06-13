@@ -328,20 +328,20 @@ export async function deploymentTriggerUpdate(deploymentTriggerId: string) {
   }
 }
 
-export async function serviceInstanceRedeploy(
+export async function serviceInstanceDeploy(
   environmentId: string,
   serviceId: string
 ) {
-  console.log('Redeploying Service...')
+  console.log('Deploying Service...')
   console.log('Environment ID:', environmentId)
   console.log('Service ID:', serviceId)
   try {
     const query = gql`
-      mutation serviceInstanceRedeploy(
+      mutation serviceInstanceDeploy(
         $environmentId: String!
         $serviceId: String!
       ) {
-        serviceInstanceRedeploy(
+        serviceInstanceDeploy(
           environmentId: $environmentId
           serviceId: $serviceId
         )
@@ -403,19 +403,19 @@ export async function updateEnvironmentVariablesForServices(
   }
 }
 
-export async function redeployAllServices(
+export async function deployAllServices(
   environmentId: string,
   servicesToRedeploy: string[]
 ) {
   try {
     // Create an array of promises for redeployments
     const redeployPromises = servicesToRedeploy.map((serviceId) =>
-      serviceInstanceRedeploy(environmentId, serviceId)
+      serviceInstanceDeploy(environmentId, serviceId)
     )
 
     // Await all promises to complete
     await Promise.all(redeployPromises)
-    console.log('All services redeployed successfully.')
+    console.log('All services deployed successfully.')
   } catch (error) {
     console.error('An error occurred during redeployment:', error)
   }
