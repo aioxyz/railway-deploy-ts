@@ -32100,6 +32100,7 @@ async function railwayGraphQLRequest(query, variables, caller) {
                 console.log(`Gateway Timeout (504): The Railway API timed out. Will poll for updates.`);
                 // Wait for the created environment to finish initializing
                 console.log('Waiting 15 seconds for environment to initialize and become available');
+                await new Promise((resolve) => setTimeout(resolve, 15000)); // Wait for 15 seconds
                 return pollForEnvironment();
             }
         }
@@ -32443,6 +32444,9 @@ async function runCreate() {
         let createdEnvironment = await createEnvironment(srcEnvironmentId);
         if (!createdEnvironment) {
             coreExports.info('Environment returned empty, polling...');
+            // Wait for the created environment to finish initializing
+            console.log('Waiting 15 seconds for environment to initialize and become available');
+            await new Promise((resolve) => setTimeout(resolve, 15000)); // Wait for 15 seconds
             createdEnvironment = await pollForEnvironment();
         }
         console.log('Created Environment:');

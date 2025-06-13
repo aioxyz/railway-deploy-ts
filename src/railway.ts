@@ -37,6 +37,7 @@ export async function railwayGraphQLRequest(
         console.log(
           'Waiting 15 seconds for environment to initialize and become available'
         )
+        await new Promise((resolve) => setTimeout(resolve, 15000)) // Wait for 15 seconds
         return pollForEnvironment()
       }
     } else {
