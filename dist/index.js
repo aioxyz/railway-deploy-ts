@@ -32516,7 +32516,7 @@ async function run() {
             runDestroy();
             break;
         default:
-            coreExports.setFailed(`Invalid MODE: ${MODE}`);
+            coreExports.setFailed(`Invalid MODE: ${MODE}. Only CREATE & DESTROY allowed`);
     }
 }
 

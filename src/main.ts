@@ -166,6 +166,6 @@ export async function run(): Promise<void> {
       runDestroy()
       break
     default:
-      core.setFailed(`Invalid MODE: ${MODE}`)
+      core.setFailed(`Invalid MODE: ${MODE}. Only CREATE & DESTROY allowed`)
   }
 }
