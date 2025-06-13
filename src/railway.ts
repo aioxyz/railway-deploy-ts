@@ -42,50 +42,59 @@ export async function railwayGraphQLRequest(
 }
 
 export async function deleteEnvironment(id: string) {
-  const query = `mutation deleteEnvironment($id: String!) {
-            deleteEnvironment(id: $id)
-        }`
+  const query = gql`
+    mutation environmentDelete($id: String!) {
+      environmentDelete(id: $id)
+    }
+  `
   const variables = {
     id
   }
-  return await railwayGraphQLRequest(query, variables)
+  try {
+    await railwayGraphQLRequest(query, variables)
+    console.log(`Environment ${DEST_ENV_NAME} deleted successfully`)
+  } catch (error) {
+    core.setFailed(`Delete Environment failed with error: ${error}`)
+  }
 }
 
 export async function getProject() {
-  const query = `query project($id: String!) {
-            project(id: $id) {
-                name
-                services {
-                    edges {
-                        node {
-                            id
-                            name
-                        }
-                    }
-                }
-                environments {
-                    edges {
-                        node {
-                            id
-                            name
-                            serviceInstances {
-                                edges {
-                                    node {
-                                        serviceId
-                                        startCommand
-                                        domains {
-                                            serviceDomains {
-                                                domain
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+  const query = gql`
+    query project($id: String!) {
+      project(id: $id) {
+        name
+        services {
+          edges {
+            node {
+              id
+              name
             }
-        }`
+          }
+        }
+        environments {
+          edges {
+            node {
+              id
+              name
+              serviceInstances {
+                edges {
+                  node {
+                    serviceId
+                    startCommand
+                    domains {
+                      serviceDomains {
+                        domain
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `
 
   const variables = {
     id: PROJECT_ID
@@ -95,38 +104,40 @@ export async function getProject() {
 }
 
 export async function getEnvironments() {
-  const query = `query environments($projectId: String!) {
-            environments(projectId: $projectId) {
-                edges {
-                    node {
-                        id
-                        name
-                        deployments {
-                            edges {
-                                node {
-                                    id
-                                    status
-                                }
-                            }
-                        }
-                        serviceInstances {
-                            edges {
-                                node {
-                                    id
-                                    domains {
-                                        serviceDomains {
-                                            domain
-                                        }
-                                    }
-                                    serviceId
-                                    startCommand
-                                }
-                            }
-                        }
-                    }
+  const query = gql`
+    query environments($projectId: String!) {
+      environments(projectId: $projectId) {
+        edges {
+          node {
+            id
+            name
+            deployments {
+              edges {
+                node {
+                  id
+                  status
                 }
+              }
             }
-        }`
+            serviceInstances {
+              edges {
+                node {
+                  id
+                  domains {
+                    serviceDomains {
+                      domain
+                    }
+                  }
+                  serviceId
+                  startCommand
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `
 
   const variables = {
     projectId: PROJECT_ID
@@ -136,37 +147,39 @@ export async function getEnvironments() {
 }
 
 export async function getEnvironment(id: string) {
-  const query = `query environment($id: String!) {
-            environment(id: $id) {
+  const query = gql`
+    query environment($id: String!) {
+      environment(id: $id) {
+        id
+        name
+        createdAt
+        deploymentTriggers {
+          edges {
+            node {
               id
-              name
-              createdAt
-              deploymentTriggers {
-                edges {
-                  node {
-                    id
-                    environmentId
-                    branch
-                    projectId
-                  }
-                }
-              }
-              serviceInstances {
-                edges {
-                  node {
-                    id
-                    domains {
-                      serviceDomains {
-                        domain
-                        id
-                      }
-                    }
-                    serviceId
-                  }
-                }
-              }
+              environmentId
+              branch
+              projectId
             }
-        }`
+          }
+        }
+        serviceInstances {
+          edges {
+            node {
+              id
+              domains {
+                serviceDomains {
+                  domain
+                  id
+                }
+              }
+              serviceId
+            }
+          }
+        }
+      }
+    }
+  `
 
   const variables = {
     id

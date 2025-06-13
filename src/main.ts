@@ -139,9 +139,6 @@ async function runDestroy(): Promise<void> {
     if (filteredEdges.length == 1) {
       const environmentId = filteredEdges[0].node.id
       await deleteEnvironment(environmentId)
-      console.log(
-        `Environment with name: ${DEST_ENV_NAME} and id ${environmentId} deleted successfully`
-      )
     } else {
       throw new Error('Environment does not exists. Cannot delete.')
     }

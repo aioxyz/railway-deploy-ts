@@ -32107,84 +32107,96 @@ async function railwayGraphQLRequest(query, variables, caller) {
     }
 }
 async function deleteEnvironment(id) {
-    const query = `mutation deleteEnvironment($id: String!) {
-            deleteEnvironment(id: $id)
-        }`;
+    const query = gql `
+    mutation environmentDelete($id: String!) {
+      environmentDelete(id: $id)
+    }
+  `;
     const variables = {
         id
     };
-    return await railwayGraphQLRequest(query, variables);
+    try {
+        await railwayGraphQLRequest(query, variables);
+        console.log(`Environment ${DEST_ENV_NAME$1} deleted successfully`);
+    }
+    catch (error) {
+        coreExports.setFailed(`Delete Environment failed with error: ${error}`);
+    }
 }
 async function getEnvironments() {
-    const query = `query environments($projectId: String!) {
-            environments(projectId: $projectId) {
-                edges {
-                    node {
-                        id
-                        name
-                        deployments {
-                            edges {
-                                node {
-                                    id
-                                    status
-                                }
-                            }
-                        }
-                        serviceInstances {
-                            edges {
-                                node {
-                                    id
-                                    domains {
-                                        serviceDomains {
-                                            domain
-                                        }
-                                    }
-                                    serviceId
-                                    startCommand
-                                }
-                            }
-                        }
-                    }
+    const query = gql `
+    query environments($projectId: String!) {
+      environments(projectId: $projectId) {
+        edges {
+          node {
+            id
+            name
+            deployments {
+              edges {
+                node {
+                  id
+                  status
                 }
+              }
             }
-        }`;
+            serviceInstances {
+              edges {
+                node {
+                  id
+                  domains {
+                    serviceDomains {
+                      domain
+                    }
+                  }
+                  serviceId
+                  startCommand
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
     const variables = {
         projectId: PROJECT_ID$1
     };
     return await railwayGraphQLRequest(query, variables);
 }
 async function getEnvironment(id) {
-    const query = `query environment($id: String!) {
-            environment(id: $id) {
+    const query = gql `
+    query environment($id: String!) {
+      environment(id: $id) {
+        id
+        name
+        createdAt
+        deploymentTriggers {
+          edges {
+            node {
               id
-              name
-              createdAt
-              deploymentTriggers {
-                edges {
-                  node {
-                    id
-                    environmentId
-                    branch
-                    projectId
-                  }
-                }
-              }
-              serviceInstances {
-                edges {
-                  node {
-                    id
-                    domains {
-                      serviceDomains {
-                        domain
-                        id
-                      }
-                    }
-                    serviceId
-                  }
-                }
-              }
+              environmentId
+              branch
+              projectId
             }
-        }`;
+          }
+        }
+        serviceInstances {
+          edges {
+            node {
+              id
+              domains {
+                serviceDomains {
+                  domain
+                  id
+                }
+              }
+              serviceId
+            }
+          }
+        }
+      }
+    }
+  `;
     const variables = {
         id
     };
@@ -32491,7 +32503,6 @@ async function runDestroy() {
         if (filteredEdges.length == 1) {
             const environmentId = filteredEdges[0].node.id;
             await deleteEnvironment(environmentId);
-            console.log(`Environment with name: ${DEST_ENV_NAME} and id ${environmentId} deleted successfully`);
         }
         else {
             throw new Error('Environment does not exists. Cannot delete.');
