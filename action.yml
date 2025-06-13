@@ -15,7 +15,7 @@ inputs:
     description:
       'The id of the project to create environments on. Can be found on Settings
       -> General page'
-    required: false
+    required: true
   SRC_ENVIRONMENT_NAME:
     description: 'The name of the environment to base the PRs off of. '
     required: false
