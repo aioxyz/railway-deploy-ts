@@ -1,7 +1,7 @@
 {
   "name": "railway-deploy",
   "description": "Deploys services of specific branch to new environment in Railway",
-  "version": "0.0.0",
+  "version": "v1.0.0",
   "author": "",
   "type": "module",
   "private": true,
