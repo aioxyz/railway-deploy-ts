@@ -21,7 +21,7 @@ function hasTriggersAndServices(environment: any): boolean {
     return false
   }
   return (
-    createdEnvironment.services?.edges.length > 0 &&
+    createdEnvironment.serviceInstances?.edges.length > 0 &&
     createdEnvironment.deploymentTriggers?.edges.length > 0
   )
 }
@@ -224,8 +224,9 @@ export async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
     )
 
     if (targetEnvironment) {
-      console.log(`Environment "${DEST_ENV_NAME}" found!`)
       const env = await getEnvironment(targetEnvironment.node.id)
+      console.log(`Environment "${DEST_ENV_NAME}" found:`)
+      console.dir(env, { depth: null })
       if (!env || !hasTriggersAndServices(env)) {
         core.info(
           `Environment returned empty, Retrying in ${delay / 1000} seconds...`
