@@ -32085,6 +32085,14 @@ const ENDPOINT = 'https://backboard.railway.app/graphql/v2';
 const BRANCH_NAME = coreExports.getInput('branch_name') || 'feat-railway-7';
 // Optional Inputs
 coreExports.getInput('MAX_TIMEOUT');
+function hasTriggersAndServices(environment) {
+    const createdEnvironment = environment.environmentCreate;
+    if (!createdEnvironment) {
+        return false;
+    }
+    return (createdEnvironment.serviceInstances?.edges.length > 0 &&
+        createdEnvironment.deploymentTriggers?.edges.length > 0);
+}
 async function railwayGraphQLRequest(query, variables, caller) {
     const client = new GraphQLClient(ENDPOINT, {
         headers: {
@@ -32219,8 +32227,16 @@ async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
         }
         const targetEnvironment = result.environments.edges.find((edge) => edge.node.name === DEST_ENV_NAME$1);
         if (targetEnvironment) {
-            console.log(`Environment "${DEST_ENV_NAME$1}" found!`);
-            return getEnvironment(targetEnvironment.node.id);
+            const env = await getEnvironment(targetEnvironment.node.id);
+            console.log(`Environment "${DEST_ENV_NAME$1}" found:`);
+            console.dir(env, { depth: null });
+            if (!env || !hasTriggersAndServices(env)) {
+                coreExports.info(`Environment returned empty, Retrying in ${delay / 1000} seconds...`);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+                return checkEnvironment();
+            }
+            return env;
         }
         if (attemptCount >= maxAttempts) {
             console.log(`Reached maximum attempts (${maxAttempts}). Environment not found.`);
@@ -32277,7 +32293,15 @@ async function createEnvironment(sourceEnvironmentId) {
                 sourceEnvironmentId: sourceEnvironmentId
             }
         };
-        return await railwayGraphQLRequest(query, variables, 'CREATE_ENVIRONMENT');
+        const createdEnvironment = await railwayGraphQLRequest(query, variables, 'CREATE_ENVIRONMENT');
+        if (!createdEnvironment || !hasTriggersAndServices(createdEnvironment)) {
+            coreExports.info('Environment returned empty, polling...');
+            // Wait for the created environment to finish initializing
+            console.log('Waiting 15 seconds for environment to initialize and become available');
+            await new Promise((resolve) => setTimeout(resolve, 15000)); // Wait for 15 seconds
+            return await pollForEnvironment();
+        }
+        return createdEnvironment;
     }
     catch (error) {
         coreExports.setFailed(`Action failed with error: ${error}`);
@@ -32441,14 +32465,7 @@ async function runCreate() {
             srcEnvironmentId = response.environments.edges.filter((edge) => edge.node.name === SRC_ENVIRONMENT_NAME)[0].node.id;
         }
         // Create the new Environment based on the Source Environment
-        let createdEnvironment = await createEnvironment(srcEnvironmentId);
-        if (!createdEnvironment) {
-            coreExports.info('Environment returned empty, polling...');
-            // Wait for the created environment to finish initializing
-            console.log('Waiting 15 seconds for environment to initialize and become available');
-            await new Promise((resolve) => setTimeout(resolve, 15000)); // Wait for 15 seconds
-            createdEnvironment = await pollForEnvironment();
-        }
+        const createdEnvironment = await createEnvironment(srcEnvironmentId);
         console.log('Created Environment:');
         console.dir(createdEnvironment, { depth: null });
         const { id: environmentId } = createdEnvironment.environmentCreate;
