@@ -15,6 +15,17 @@ const BRANCH_NAME = core.getInput('branch_name') || 'feat-railway-7'
 // Optional Inputs
 const DEPLOYMENT_MAX_TIMEOUT = core.getInput('MAX_TIMEOUT')
 
+function hasTriggersAndServices(environment: any): boolean {
+  const createdEnvironment = environment.environmentCreate
+  if (!createdEnvironment) {
+    return false
+  }
+  return (
+    createdEnvironment.services?.edges.length > 0 &&
+    createdEnvironment.deploymentTriggers?.edges.length > 0
+  )
+}
+
 export async function railwayGraphQLRequest(
   query: string,
   variables: Record<string, any>,
@@ -214,7 +225,16 @@ export async function pollForEnvironment(maxAttempts = 6, initialDelay = 2000) {
 
     if (targetEnvironment) {
       console.log(`Environment "${DEST_ENV_NAME}" found!`)
-      return getEnvironment(targetEnvironment.node.id)
+      const env = await getEnvironment(targetEnvironment.node.id)
+      if (!env || !hasTriggersAndServices(env)) {
+        core.info(
+          `Environment returned empty, Retrying in ${delay / 1000} seconds...`
+        )
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        delay *= 2 // Exponential backoff
+        return checkEnvironment()
+      }
+      return env
     }
 
     if (attemptCount >= maxAttempts) {
@@ -282,7 +302,21 @@ export async function createEnvironment(sourceEnvironmentId: string) {
         sourceEnvironmentId: sourceEnvironmentId
       }
     }
-    return await railwayGraphQLRequest(query, variables, 'CREATE_ENVIRONMENT')
+    const createdEnvironment = await railwayGraphQLRequest(
+      query,
+      variables,
+      'CREATE_ENVIRONMENT'
+    )
+    if (!createdEnvironment || !hasTriggersAndServices(createdEnvironment)) {
+      core.info('Environment returned empty, polling...')
+      // Wait for the created environment to finish initializing
+      console.log(
+        'Waiting 15 seconds for environment to initialize and become available'
+      )
+      await new Promise((resolve) => setTimeout(resolve, 15000)) // Wait for 15 seconds
+      return await pollForEnvironment()
+    }
+    return createdEnvironment
   } catch (error) {
     core.setFailed(`Action failed with error: ${error}`)
   }
