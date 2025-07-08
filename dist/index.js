@@ -38124,7 +38124,9 @@ async function deployAllServices(environmentId, servicesToRedeploy, enforceOrder
             console.log('Enforcing deployment order: ', servicesToRedeploy.map((s) => s.name).join(', '));
             for await (const service of servicesToRedeploy) {
                 const deployment = await serviceInstanceDeploy(environmentId, service.id);
-                const { serviceInstanceDeployV2: deploymentId } = deployment.data;
+                console.log('Deployment Created: ');
+                console.dir(deployment);
+                const { serviceInstanceDeployV2: deploymentId } = deployment;
                 await startDeploymentSubscription(deploymentId);
             }
         }

@@ -537,7 +537,9 @@ export async function deployAllServices(
           environmentId,
           service.id
         )
-        const { serviceInstanceDeployV2: deploymentId } = deployment.data
+        console.log('Deployment Created: ')
+        console.dir(deployment)
+        const { serviceInstanceDeployV2: deploymentId } = deployment
         await startDeploymentSubscription(deploymentId)
       }
     } else {
