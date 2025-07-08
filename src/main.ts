@@ -90,24 +90,31 @@ async function runCreate(): Promise<void> {
 
     const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY)
     const deploymentOrder: string[] = JSON.parse(DEPLOYMENT_ORDER)
-    let servicesToDeploy: { id: string; name: string; domains: any }[] =
-      await createdEnvironment.environmentCreate.serviceInstances.edges
-        .map(async (serviceInstance: any) => {
-          const id = serviceInstance.node.serviceId
-          const { domains } = serviceInstance.node
-          const { service } = await getService(id)
-          const { name } = service
+    const servicePromises: Promise<{
+      id: string
+      name: string
+      domains: any
+    }>[] = createdEnvironment.environmentCreate.serviceInstances.edges.map(
+      async (serviceInstance: any) => {
+        const id = serviceInstance.node.serviceId
+        const { domains } = serviceInstance.node
+        const { service } = await getService(id)
+        const { name } = service
 
-          return {
-            name,
-            id,
-            domains
-          }
-        })
-        .filter(
-          (s: { name: string; id: string }) =>
-            !servicesToIgnore.includes(s.name)
-        )
+        return {
+          name,
+          id,
+          domains
+        }
+      }
+    )
+
+    const allServices = await Promise.all(servicePromises)
+
+    let servicesToDeploy: { id: string; name: string; domains: any }[] =
+      allServices.filter(
+        (s: { name: string; id: string }) => !servicesToIgnore.includes(s.name)
+      )
 
     const enforceOrder = deploymentOrder && deploymentOrder.length > 0
 
