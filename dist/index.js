@@ -38207,8 +38207,7 @@ async function runCreate() {
         await updateAllDeploymentTriggers(deploymentTriggerIds);
         const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY);
         const deploymentOrder = JSON.parse(DEPLOYMENT_ORDER);
-        let servicesToDeploy = await createdEnvironment.environmentCreate.serviceInstances.edges
-            .map(async (serviceInstance) => {
+        const servicePromises = createdEnvironment.environmentCreate.serviceInstances.edges.map(async (serviceInstance) => {
             const id = serviceInstance.node.serviceId;
             const { domains } = serviceInstance.node;
             const { service } = await getService(id);
@@ -38218,8 +38217,9 @@ async function runCreate() {
                 id,
                 domains
             };
-        })
-            .filter((s) => !servicesToIgnore.includes(s.name));
+        });
+        const allServices = await Promise.all(servicePromises);
+        let servicesToDeploy = allServices.filter((s) => !servicesToIgnore.includes(s.name));
         const enforceOrder = deploymentOrder && deploymentOrder.length > 0;
         // if deployment order is specified get the services in the correct order
         if (enforceOrder) {
