@@ -37742,7 +37742,7 @@ const ENDPOINT = 'https://backboard.railway.app/graphql/v2';
 // Github Required Inputs
 const BRANCH_NAME = coreExports.getInput('branch_name') || 'feat-railway-7';
 // Optional Inputs
-coreExports.getInput('MAX_TIMEOUT');
+const DEPLOYMENT_MAX_TIMEOUT = coreExports.getInput('MAX_TIMEOUT');
 function hasTriggersAndServices(environment) {
     const createdEnvironment = environment.environmentCreate;
     if (!createdEnvironment) {
@@ -37776,9 +37776,17 @@ async function startDeploymentSubscription(deploymentId) {
             id: deploymentId
         }
     });
+    // Set a timeout to prevent the subscription from running indefinitely
+    setTimeout(() => {
+        console.log(`Deployment subscription timed out after ${DEPLOYMENT_MAX_TIMEOUT || 15} minutes`);
+        if (subscription && subscription.return) {
+            subscription.return();
+        }
+    }, (parseInt(DEPLOYMENT_MAX_TIMEOUT) || 15) * 60 * 1000);
     try {
         for await (const result of subscription) {
-            console.log(`Received result: ${result}`);
+            console.log(`Received result:`);
+            console.dir(result, { depth: null });
             let status;
             if (result && result.data) {
                 const data = result.data.data;
