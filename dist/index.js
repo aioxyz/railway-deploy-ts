@@ -38224,7 +38224,7 @@ async function runCreate() {
         // if deployment order is specified get the services in the correct order
         if (enforceOrder) {
             servicesToDeploy = deploymentOrder.map((name) => {
-                const service = servicesToDeploy.find((s) => s.name === name);
+                const service = servicesToDeploy.find((s) => s.name.toLowerCase() === name.toLocaleLowerCase());
                 if (!service) {
                     throw new Error(`Service ${name} not found in the environment`);
                 }
