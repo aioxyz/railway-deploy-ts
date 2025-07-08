@@ -17,6 +17,7 @@ const SRC_ENVIRONMENT_NAME = core.getInput('SRC_ENVIRONMENT_NAME')
 const SRC_ENVIRONMENT_ID = core.getInput('SRC_ENVIRONMENT_ID')
 const ENV_VARS = core.getInput('ENV_VARS')
 const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
+const DEPLOYMENT_ORDER = core.getInput('DEPLOYMENT_ORDER')
 const IGNORE_SERVICE_REDEPLOY = core.getInput('IGNORE_SERVICE_REDEPLOY')
 
 async function runCreate(): Promise<void> {
@@ -71,6 +72,7 @@ async function runCreate(): Promise<void> {
     const { serviceInstances } = createdEnvironment.environmentCreate
 
     // Update the Environment Variables on each Service Instance
+    // TODO: ONLY ADD ENV_VARS to its corresponding service
     await updateEnvironmentVariablesForServices(
       environmentId,
       serviceInstances,
@@ -87,19 +89,41 @@ async function runCreate(): Promise<void> {
     await updateAllDeploymentTriggers(deploymentTriggerIds)
 
     const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY)
-    const servicesToDeploy: string[] = []
+    const deploymentOrder: string[] = JSON.parse(DEPLOYMENT_ORDER)
+    let servicesToDeploy: { id: string; name: string; domains: any }[] =
+      await createdEnvironment.environmentCreate.serviceInstances.edges
+        .map(async (serviceInstance: any) => {
+          const id = serviceInstance.node.serviceId
+          const { domains } = serviceInstance.node
+          const { service } = await getService(id)
+          const { name } = service
 
-    // Get the names for each deployed service
-    for (const serviceInstance of createdEnvironment.environmentCreate
-      .serviceInstances.edges) {
-      const { domains } = serviceInstance.node
-      const { service } = await getService(serviceInstance.node.serviceId)
-      const { name } = service
+          return {
+            name,
+            id,
+            domains
+          }
+        })
+        .filter(
+          (s: { name: string; id: string }) =>
+            !servicesToIgnore.includes(s.name)
+        )
 
-      if (!servicesToIgnore.includes(name)) {
-        servicesToDeploy.push(serviceInstance.node.serviceId)
-      }
+    const enforceOrder = deploymentOrder && deploymentOrder.length > 0
 
+    // if deployment order is specified get the services in the correct order
+    if (enforceOrder) {
+      servicesToDeploy = deploymentOrder.map((name) => {
+        const service = servicesToDeploy.find((s) => s.name === name)
+        if (!service) {
+          throw new Error(`Service ${name} not found in the environment`)
+        }
+        return service
+      })
+    }
+
+    for (const service of servicesToDeploy) {
+      const { name, domains } = service
       if (
         (API_SERVICE_NAME && name === API_SERVICE_NAME) ||
         name === 'app' ||
@@ -118,8 +142,41 @@ async function runCreate(): Promise<void> {
       }
     }
 
+    // Get the names for each deployed service
+    // for (const service of servicesToDeploy) {
+    //   const { domains } = serviceInstance.node
+    //   const { service } = await getService(serviceInstance.node.serviceId)
+    //   const { name } = service
+
+    //   if (!servicesToIgnore.includes(name)) {
+    //     servicesToDeploy.push(serviceInstance.node.serviceId)
+    //   }
+
+    //   if (deploymentOrder && deploymentOrder.length > 0) {
+    //     if (deploymentOrder.includes(name)) {
+    //     }
+    //   }
+
+    //   if (
+    //     (API_SERVICE_NAME && name === API_SERVICE_NAME) ||
+    //     name === 'app' ||
+    //     name === 'backend' ||
+    //     name === 'web'
+    //   ) {
+    //     const domainData = domains.serviceDomains?.[0]
+    //     if (domainData) {
+    //       const { domain } = domainData
+    //       console.log('Domain:', domain)
+    //       core.setOutput('service_domain', domain)
+    //     } else {
+    //       console.log('Domain data is undefined')
+    //       // Handle the case where serviceDomains is undefined
+    //     }
+    //   }
+    // }
+
     // Redeploy the Services
-    await deployAllServices(environmentId, servicesToDeploy)
+    await deployAllServices(environmentId, servicesToDeploy, enforceOrder)
   } catch (error) {
     console.error('Error in runCreate:', error)
     // Handle the error, e.g., fail the action

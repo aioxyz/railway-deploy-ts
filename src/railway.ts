@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { gql, GraphQLClient } from 'graphql-request'
+import { createClient } from 'graphql-ws'
+import WebSocket from 'ws'
 import * as core from '@actions/core'
 
 // Railway Required Inputs
@@ -24,6 +26,69 @@ function hasTriggersAndServices(environment: any): boolean {
     createdEnvironment.serviceInstances?.edges.length > 0 &&
     createdEnvironment.deploymentTriggers?.edges.length > 0
   )
+}
+
+// Initialize the WebSocket client for subscriptions
+const wsClient = createClient({
+  url: ENDPOINT,
+  webSocketImpl: WebSocket,
+  connectionParams: {
+    Authorization: `Bearer ${RAILWAY_API_TOKEN}`
+  }
+})
+
+// Subscription document
+const DEPLOYMENT_STATUS_SUBSCRIPTION = gql`
+  subscription deployment($id: String!) {
+    deployment(id: $id) {
+      id
+      status
+    }
+  }
+`
+
+async function startDeploymentSubscription(deploymentId: string) {
+  interface DeploymentData {
+    status: string
+    id: string
+  }
+
+  interface SubscriptionResult {
+    data: {
+      deployment: DeploymentData
+    }
+  }
+
+  console.log('Starting deployment status subscription...')
+
+  const subscription = wsClient.iterate<SubscriptionResult>({
+    query: DEPLOYMENT_STATUS_SUBSCRIPTION,
+    variables: {
+      id: deploymentId
+    }
+  })
+
+  try {
+    for await (const result of subscription) {
+      console.log(`Received result: ${result}`)
+
+      let status: string
+      if (result && result.data) {
+        const data = result.data.data
+        if (data && data.deployment) {
+          status = data.deployment.status
+          console.log(`Deployment status: ${status}`)
+          if (status === 'SUCCEEDED') {
+            break
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Subscription error:', error)
+  } finally {
+    console.log('Subscription completed')
+  }
 }
 
 export async function railwayGraphQLRequest(
@@ -390,11 +455,11 @@ export async function serviceInstanceDeploy(
   console.log('Service ID:', serviceId)
   try {
     const query = gql`
-      mutation serviceInstanceDeploy(
+      mutation serviceInstanceDeployV2(
         $environmentId: String!
         $serviceId: String!
       ) {
-        serviceInstanceDeploy(
+        serviceInstanceDeployV2(
           environmentId: $environmentId
           serviceId: $serviceId
         )
@@ -458,17 +523,33 @@ export async function updateEnvironmentVariablesForServices(
 
 export async function deployAllServices(
   environmentId: string,
-  servicesToRedeploy: string[]
+  servicesToRedeploy: { id: string; name: string }[],
+  enforceOrder = false
 ) {
   try {
-    // Create an array of promises for redeployments
-    const redeployPromises = servicesToRedeploy.map((serviceId) =>
-      serviceInstanceDeploy(environmentId, serviceId)
-    )
+    if (enforceOrder) {
+      console.log(
+        'Enforcing deployment order: ',
+        servicesToRedeploy.map((s) => s.name).join(', ')
+      )
+      for await (const service of servicesToRedeploy) {
+        const deployment = await serviceInstanceDeploy(
+          environmentId,
+          service.id
+        )
+        const { serviceInstanceDeployV2: deploymentId } = deployment.data
+        await startDeploymentSubscription(deploymentId)
+      }
+    } else {
+      // Create an array of promises for redeployments
+      const redeployPromises = servicesToRedeploy.map((service) =>
+        serviceInstanceDeploy(environmentId, service.id)
+      )
 
-    // Await all promises to complete
-    await Promise.all(redeployPromises)
-    console.log('All services deployed successfully.')
+      // Await all promises to complete
+      await Promise.all(redeployPromises)
+      console.log('All services deployed successfully.')
+    }
   } catch (error) {
     console.error('An error occurred during redeployment:', error)
   }
