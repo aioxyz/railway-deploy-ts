@@ -537,8 +537,8 @@ export async function deployAllServices(
           environmentId,
           service.id
         )
-        console.log('Deployment Created: ')
-        console.dir(deployment)
+        console.log('Deployment Created:')
+        console.dir(deployment, { depth: null })
         const { serviceInstanceDeployV2: deploymentId } = deployment
         await startDeploymentSubscription(deploymentId)
       }
