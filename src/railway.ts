@@ -92,7 +92,11 @@ async function startDeploymentSubscription(deploymentId: string) {
         if (data && data.deployment) {
           status = data.deployment.status
           console.log(`Deployment status: ${status}`)
-          if (status === 'SUCCEEDED') {
+          if (
+            status === 'SUCCESS' ||
+            status === 'FAILED' ||
+            status === 'CRASHED'
+          ) {
             break
           }
         }
