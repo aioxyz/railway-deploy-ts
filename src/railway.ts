@@ -35,7 +35,9 @@ const wsClient = createClient({
   url: WS_ENDPOINT,
   webSocketImpl: WebSocket,
   connectionParams: () => ({
-    Authorization: `Bearer ${RAILWAY_API_TOKEN}`
+    headers: {
+      Authorization: `Bearer ${RAILWAY_API_TOKEN}`
+    }
   }),
   on: {
     connected: () => console.log('Connected to Railway WebSocket API'),
