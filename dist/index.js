@@ -38306,6 +38306,11 @@ const wsClient = createClient({
     webSocketImpl: WebSocket$1,
     connectionParams: {
         Authorization: `Bearer ${RAILWAY_API_TOKEN}`
+    },
+    on: {
+        connected: () => console.log('Connected to Railway WebSocket API'),
+        error: (error) => console.error('WebSocket connection error:', error),
+        closed: () => console.log('WebSocket connection closed')
     }
 });
 // Subscription document
@@ -38324,42 +38329,107 @@ function toObservable(operation) {
         complete: () => observer.complete()
     }));
 }
-async function startDeploymentSubscription(deploymentId) {
-    console.log('Starting deployment status subscription...');
-    const observable = toObservable({
-        query: DEPLOYMENT_STATUS_SUBSCRIPTION,
-        variables: {
-            id: deploymentId
-        }
-    });
-    const subscription = observable.subscribe({
-        next: (data) => {
-            console.log(`Received result:`);
-            console.dir(data, { depth: null });
-            const status = data.deployment.status;
-            if (status === 'SUCCESS' || status === 'FAILED' || status === 'CRASHED') {
+async function subscribeToDeployment(deploymentId) {
+    console.log(`Starting subscription for deployment ${deploymentId}...`);
+    return new Promise((resolve, reject) => {
+        // Create timeout to handle max duration
+        const timeoutId = setTimeout(() => {
+            if (subscription) {
                 subscription.unsubscribe();
-                return;
             }
-        },
-        error: (err) => {
-            console.error('Subscription error:', err);
-            return;
-        },
-        complete: () => {
-            console.log('Subscription completed');
-            return;
-        }
+            reject(new Error(`Deployment timed out after ${DEPLOYMENT_MAX_TIMEOUT || 15} minutes`));
+        }, (parseInt(DEPLOYMENT_MAX_TIMEOUT) || 15) * 60 * 1000);
+        const observable = toObservable({
+            query: DEPLOYMENT_STATUS_SUBSCRIPTION,
+            variables: {
+                id: deploymentId
+            }
+        });
+        const subscription = observable.subscribe({
+            next: (result) => {
+                if (!result.data || !result.data.deployment) {
+                    console.log('Received unexpected subscription data format:', result);
+                    return;
+                }
+                const { status, id } = result.data.deployment;
+                console.log(`Deployment ${id} status: ${status}`);
+                // Handle terminal states
+                if (status === 'SUCCESS') {
+                    clearTimeout(timeoutId);
+                    subscription.unsubscribe();
+                    resolve('SUCCESS');
+                }
+                else if (status === 'FAILED' || status === 'CRASHED') {
+                    clearTimeout(timeoutId);
+                    subscription.unsubscribe();
+                    reject(new Error(`Deployment failed with status: ${status}`));
+                }
+                // For other statuses (IN_PROGRESS, BUILDING, etc.), keep subscription open
+            },
+            error: (err) => {
+                console.error('Subscription error:', err);
+                clearTimeout(timeoutId);
+                reject(err);
+            },
+            complete: () => {
+                console.log('Subscription completed');
+                clearTimeout(timeoutId);
+                // If we reach here without hitting a terminal state, resolve with unknown
+                resolve('COMPLETED');
+            }
+        });
     });
-    // Set a timeout to prevent the subscription from running indefinitely
-    setTimeout(() => {
-        console.log(`Deployment subscription timed out after ${DEPLOYMENT_MAX_TIMEOUT || 15} minutes`);
-        if (subscription && subscription.return) {
-            subscription.unsubscribe();
-            return;
-        }
-    }, (parseInt(DEPLOYMENT_MAX_TIMEOUT) || 15) * 60 * 1000);
 }
+// async function startDeploymentSubscription(deploymentId: string) {
+//   interface DeploymentData {
+//     status: string
+//     id: string
+//   }
+//   interface SubscriptionResult {
+//     data: {
+//       deployment: DeploymentData
+//     }
+//   }
+//   console.log('Starting deployment status subscription...')
+//   const observable = toObservable({
+//     query: DEPLOYMENT_STATUS_SUBSCRIPTION,
+//     variables: {
+//       id: deploymentId
+//     }
+//   })
+//   const subscription = observable.subscribe({
+//     next: (data) => {
+//       console.log(`Received result:`)
+//       console.dir(data, { depth: null })
+//       const status = data.deployment.status
+//       if (status === 'SUCCESS' || status === 'FAILED' || status === 'CRASHED') {
+//         subscription.unsubscribe()
+//         return
+//       }
+//     },
+//     error: (err) => {
+//       console.error('Subscription error:', err)
+//       return
+//     },
+//     complete: () => {
+//       console.log('Subscription completed')
+//       return
+//     }
+//   })
+//   // Set a timeout to prevent the subscription from running indefinitely
+//   setTimeout(
+//     () => {
+//       console.log(
+//         `Deployment subscription timed out after ${DEPLOYMENT_MAX_TIMEOUT || 15} minutes`
+//       )
+//       if (subscription && subscription.return) {
+//         subscription.unsubscribe()
+//         return
+//       }
+//     },
+//     (parseInt(DEPLOYMENT_MAX_TIMEOUT) || 15) * 60 * 1000
+//   )
+// }
 // async function startDeploymentSubscription(deploymentId: string) {
 //   interface DeploymentData {
 //     status: string
@@ -38743,7 +38813,15 @@ async function deployAllServices(environmentId, servicesToRedeploy, enforceOrder
                 console.log('Deployment Created:');
                 console.dir(deployment, { depth: null });
                 const { serviceInstanceDeployV2: deploymentId } = deployment;
-                await startDeploymentSubscription(deploymentId);
+                console.log(`Waiting for deployment ${deploymentId} to complete...`);
+                try {
+                    const result = await subscribeToDeployment(deploymentId);
+                    console.log(`Service ${service.name} deployment completed with status: ${result}`);
+                }
+                catch (error) {
+                    console.error(`Service ${service.name} deployment failed:`, error);
+                    throw error; // Re-throw to stop the deployment chain on failure
+                }
             }
         }
         else {
