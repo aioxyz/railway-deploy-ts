@@ -38316,8 +38316,7 @@ const wsClient = createClient({
     }
 });
 // Subscription document
-const DEPLOYMENT_STATUS_SUBSCRIPTION = gql `
-  subscription deployment($id: String!) {
+const DEPLOYMENT_STATUS_SUBSCRIPTION = `subscription deployment($id: String!) {
     deployment(id: $id) {
       id
       status
