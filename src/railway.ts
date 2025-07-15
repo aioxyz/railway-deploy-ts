@@ -11,7 +11,7 @@ const RAILWAY_API_TOKEN = core.getInput('RAILWAY_API_TOKEN')
 const PROJECT_ID = core.getInput('PROJECT_ID')
 const DEST_ENV_NAME = core.getInput('DEST_ENV_NAME')
 const ENDPOINT = 'https://backboard.railway.app/graphql/v2'
-const WS_ENDPOINT = 'wss://backboard.railway.app/graphql/v2'
+const WS_ENDPOINT = 'ws://backboard.railway.app/graphql/v2'
 
 // Github Required Inputs
 const BRANCH_NAME = core.getInput('branch_name') || 'feat-railway-7'
@@ -63,6 +63,7 @@ function toObservable(operation) {
     })
   )
 }
+
 export async function subscribeToDeployment(
   deploymentId: string
 ): Promise<string> {
