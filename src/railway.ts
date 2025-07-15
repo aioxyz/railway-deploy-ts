@@ -4,12 +4,14 @@ import { gql, GraphQLClient } from 'graphql-request'
 import { createClient } from 'graphql-ws'
 import WebSocket from 'ws'
 import * as core from '@actions/core'
+import Observable from 'zen-observable'
 
 // Railway Required Inputs
 const RAILWAY_API_TOKEN = core.getInput('RAILWAY_API_TOKEN')
 const PROJECT_ID = core.getInput('PROJECT_ID')
 const DEST_ENV_NAME = core.getInput('DEST_ENV_NAME')
 const ENDPOINT = 'https://backboard.railway.app/graphql/v2'
+const WS_ENDPOINT = 'wss://backboard.railway.app/graphql/v2'
 
 // Github Required Inputs
 const BRANCH_NAME = core.getInput('branch_name') || 'feat-railway-7'
@@ -30,8 +32,8 @@ function hasTriggersAndServices(environment: any): boolean {
 
 // Initialize the WebSocket client for subscriptions
 const wsClient = createClient({
-  url: ENDPOINT,
-  webSocketImpl: WebSocket,
+  url: WS_ENDPOINT,
+  // webSocketImpl: WebSocket,
   connectionParams: {
     Authorization: `Bearer ${RAILWAY_API_TOKEN}`
   }
@@ -47,6 +49,16 @@ const DEPLOYMENT_STATUS_SUBSCRIPTION = gql`
   }
 `
 
+function toObservable(operation) {
+  return new Observable((observer) =>
+    wsClient.subscribe(operation, {
+      next: (data) => observer.next(data),
+      error: (err) => observer.error(err),
+      complete: () => observer.complete()
+    })
+  )
+}
+
 async function startDeploymentSubscription(deploymentId: string) {
   interface DeploymentData {
     status: string
@@ -61,10 +73,30 @@ async function startDeploymentSubscription(deploymentId: string) {
 
   console.log('Starting deployment status subscription...')
 
-  const subscription = wsClient.iterate<SubscriptionResult>({
+  const observable = toObservable({
     query: DEPLOYMENT_STATUS_SUBSCRIPTION,
     variables: {
       id: deploymentId
+    }
+  })
+
+  const subscription = observable.subscribe({
+    next: (data) => {
+      console.log(`Received result:`)
+      console.dir(data, { depth: null })
+      const status = data.deployment.status
+      if (status === 'SUCCESS' || status === 'FAILED' || status === 'CRASHED') {
+        subscription.unsubscribe()
+        return
+      }
+    },
+    error: (err) => {
+      console.error('Subscription error:', err)
+      return
+    },
+    complete: () => {
+      console.log('Subscription completed')
+      return
     }
   })
 
@@ -75,39 +107,75 @@ async function startDeploymentSubscription(deploymentId: string) {
         `Deployment subscription timed out after ${DEPLOYMENT_MAX_TIMEOUT || 15} minutes`
       )
       if (subscription && subscription.return) {
-        subscription.return()
+        subscription.unsubscribe()
+        return
       }
     },
     (parseInt(DEPLOYMENT_MAX_TIMEOUT) || 15) * 60 * 1000
   )
-
-  try {
-    for await (const result of subscription) {
-      console.log(`Received result:`)
-      console.dir(result, { depth: null })
-
-      let status: string
-      if (result && result.data) {
-        const data = result.data.data
-        if (data && data.deployment) {
-          status = data.deployment.status
-          console.log(`Deployment status: ${status}`)
-          if (
-            status === 'SUCCESS' ||
-            status === 'FAILED' ||
-            status === 'CRASHED'
-          ) {
-            break
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Subscription error:', error)
-  } finally {
-    console.log('Subscription completed')
-  }
 }
+
+// async function startDeploymentSubscription(deploymentId: string) {
+//   interface DeploymentData {
+//     status: string
+//     id: string
+//   }
+
+//   interface SubscriptionResult {
+//     data: {
+//       deployment: DeploymentData
+//     }
+//   }
+
+//   console.log('Starting deployment status subscription...')
+
+//   const subscription = wsClient.iterate<SubscriptionResult>({
+//     query: DEPLOYMENT_STATUS_SUBSCRIPTION,
+//     variables: {
+//       id: deploymentId
+//     }
+//   })
+
+//   // Set a timeout to prevent the subscription from running indefinitely
+//   setTimeout(
+//     () => {
+//       console.log(
+//         `Deployment subscription timed out after ${DEPLOYMENT_MAX_TIMEOUT || 15} minutes`
+//       )
+//       if (subscription && subscription.return) {
+//         subscription.return()
+//       }
+//     },
+//     (parseInt(DEPLOYMENT_MAX_TIMEOUT) || 15) * 60 * 1000
+//   )
+
+//   try {
+//     for await (const result of subscription) {
+//       console.log(`Received result:`)
+//       console.dir(result, { depth: null })
+
+//       let status: string
+//       if (result && result.data) {
+//         const data = result.data.data
+//         if (data && data.deployment) {
+//           status = data.deployment.status
+//           console.log(`Deployment status: ${status}`)
+//           if (
+//             status === 'SUCCESS' ||
+//             status === 'FAILED' ||
+//             status === 'CRASHED'
+//           ) {
+//             break
+//           }
+//         }
+//       }
+//     }
+//   } catch (error) {
+//     console.error('Subscription error:', error)
+//   } finally {
+//     console.log('Subscription completed')
+//   }
+// }
 
 export async function railwayGraphQLRequest(
   query: string,
