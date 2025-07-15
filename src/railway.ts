@@ -33,7 +33,7 @@ function hasTriggersAndServices(environment: any): boolean {
 // Initialize the WebSocket client for subscriptions
 const wsClient = createClient({
   url: WS_ENDPOINT,
-  // webSocketImpl: WebSocket,
+  webSocketImpl: WebSocket,
   connectionParams: {
     Authorization: `Bearer ${RAILWAY_API_TOKEN}`
   }
