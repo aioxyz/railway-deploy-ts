@@ -25,6 +25,11 @@ inputs:
       'The id of the environment to base the PRs off of. If this is provided,
       SRC_ENVIRONMENT_NAME will be ignored. '
     required: false
+  SVC_ID:
+    description:
+      'The service id that you want to connect, only relevant when MODE =
+      CONNECT'
+    required: false
   SRC_IMG:
     description:
       'The image to connect the source env to, only relevant when MODE = CONNECT'

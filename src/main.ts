@@ -17,6 +17,7 @@ const PROJECT_ID = core.getInput('PROJECT_ID')
 const SRC_ENVIRONMENT_NAME = core.getInput('SRC_ENVIRONMENT_NAME')
 const SRC_ENVIRONMENT_ID = core.getInput('SRC_ENVIRONMENT_ID')
 const SRC_IMG = core.getInput('SRC_IMG')
+const SVC_ID = core.getInput('SVC_ID')
 const ENV_VARS = core.getInput('ENV_VARS')
 const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
 const DEPLOYMENT_ORDER = core.getInput('DEPLOYMENT_ORDER')
@@ -219,8 +220,12 @@ async function runDestroy(): Promise<void> {
 }
 
 async function runConnect(): Promise<void> {
+  if (!SVC_ID || !SRC_IMG) {
+    console.log('SVC_ID and SRC_IMG are required when MODE is CONNECT')
+    core.setFailed('Service connection aborted')
+  }
   try {
-    await serviceConnect(SRC_IMG, SRC_ENVIRONMENT_ID)
+    await serviceConnect(SRC_IMG, SVC_ID)
   } catch (error) {
     console.error('Error in runConnect:', error)
     // Handle the error, e.g., fail the action
