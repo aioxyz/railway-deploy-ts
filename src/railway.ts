@@ -279,6 +279,26 @@ export async function railwayGraphQLRequest(
   }
 }
 
+export async function serviceConnect(image: string, id: string) {
+  const query = gql`
+    mutation serviceConnect($id: String!, $input: ServiceConnectInput!) {
+      serviceConnect(id: $id, input: $input) {
+        id
+      }
+    }
+  `
+  const variables = {
+    id,
+    input: { image }
+  }
+  try {
+    await railwayGraphQLRequest(query, variables)
+    console.log(`Service ${id} connect to ${image} successfully`)
+  } catch (error) {
+    core.setFailed(`Service connection failed with error: ${error}`)
+  }
+}
+
 export async function deleteEnvironment(id: string) {
   const query = gql`
     mutation environmentDelete($id: String!) {

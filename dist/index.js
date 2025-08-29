@@ -38510,6 +38510,26 @@ async function railwayGraphQLRequest(query, variables, caller) {
         }
     }
 }
+async function serviceConnect(image, id) {
+    const query = gql `
+    mutation serviceConnect($id: String!, $input: ServiceConnectInput!) {
+      serviceConnect(id: $id, input: $input) {
+        id
+      }
+    }
+  `;
+    const variables = {
+        id,
+        input: { image }
+    };
+    try {
+        await railwayGraphQLRequest(query, variables);
+        console.log(`Service ${id} connect to ${image} successfully`);
+    }
+    catch (error) {
+        coreExports.setFailed(`Service connection failed with error: ${error}`);
+    }
+}
 async function deleteEnvironment(id) {
     const query = gql `
     mutation environmentDelete($id: String!) {
@@ -38855,6 +38875,7 @@ const DEST_ENV_NAME = coreExports.getInput('DEST_ENV_NAME');
 const PROJECT_ID = coreExports.getInput('PROJECT_ID');
 const SRC_ENVIRONMENT_NAME = coreExports.getInput('SRC_ENVIRONMENT_NAME');
 const SRC_ENVIRONMENT_ID = coreExports.getInput('SRC_ENVIRONMENT_ID');
+const SRC_IMG = coreExports.getInput('SRC_IMG');
 const ENV_VARS = coreExports.getInput('ENV_VARS');
 const API_SERVICE_NAME = coreExports.getInput('API_SERVICE_NAME');
 const DEPLOYMENT_ORDER = coreExports.getInput('DEPLOYMENT_ORDER');
@@ -39004,6 +39025,16 @@ async function runDestroy() {
         coreExports.setFailed('Environment destruction failed');
     }
 }
+async function runConnect() {
+    try {
+        await serviceConnect(SRC_IMG, SRC_ENVIRONMENT_ID);
+    }
+    catch (error) {
+        console.error('Error in runConnect:', error);
+        // Handle the error, e.g., fail the action
+        coreExports.setFailed('Service Connect Failed');
+    }
+}
 /**
  * The main function for the action.
  *
@@ -39011,6 +39042,9 @@ async function runDestroy() {
  */
 async function run() {
     switch (MODE) {
+        case 'CONNECT':
+            runConnect();
+            break;
         case 'CREATE':
             runCreate();
             break;

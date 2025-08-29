@@ -7,7 +7,8 @@ import {
   updateAllDeploymentTriggers,
   getService,
   deployAllServices,
-  deleteEnvironment
+  deleteEnvironment,
+  serviceConnect
 } from './railway.js'
 
 const MODE = core.getInput('MODE')
@@ -15,6 +16,7 @@ const DEST_ENV_NAME = core.getInput('DEST_ENV_NAME')
 const PROJECT_ID = core.getInput('PROJECT_ID')
 const SRC_ENVIRONMENT_NAME = core.getInput('SRC_ENVIRONMENT_NAME')
 const SRC_ENVIRONMENT_ID = core.getInput('SRC_ENVIRONMENT_ID')
+const SRC_IMG = core.getInput('SRC_IMG')
 const ENV_VARS = core.getInput('ENV_VARS')
 const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
 const DEPLOYMENT_ORDER = core.getInput('DEPLOYMENT_ORDER')
@@ -216,6 +218,16 @@ async function runDestroy(): Promise<void> {
   }
 }
 
+async function runConnect(): Promise<void> {
+  try {
+    await serviceConnect(SRC_IMG, SRC_ENVIRONMENT_ID)
+  } catch (error) {
+    console.error('Error in runConnect:', error)
+    // Handle the error, e.g., fail the action
+    core.setFailed('Service Connect Failed')
+  }
+}
+
 /**
  * The main function for the action.
  *
@@ -223,6 +235,9 @@ async function runDestroy(): Promise<void> {
  */
 export async function run(): Promise<void> {
   switch (MODE) {
+    case 'CONNECT':
+      runConnect()
+      break
     case 'CREATE':
       runCreate()
       break
