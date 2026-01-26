@@ -38703,7 +38703,8 @@ async function createEnvironment(sourceEnvironmentId) {
                 name: DEST_ENV_NAME$1,
                 projectId: PROJECT_ID$1,
                 skipInitialDeploys: true,
-                sourceEnvironmentId: sourceEnvironmentId
+                sourceEnvironmentId: sourceEnvironmentId,
+                ephemeral: true
             }
         };
         const createdEnvironment = await railwayGraphQLRequest(query, variables, 'CREATE_ENVIRONMENT');
@@ -38807,6 +38808,48 @@ async function updateAllDeploymentTriggers(deploymentTriggerIds) {
         console.error('An error occurred during the update:', error);
     }
 }
+async function createVolume(environmentId, volume) {
+    console.log('Creating Volume for service: ', volume.svc_name);
+    try {
+        const query = gql `
+      mutation volumeCreate($input: VolumeCreateInput!) {
+        volumeCreate(input: $input) {
+          environmentId
+          projectId
+          mountPath
+          serviceId
+        }
+      }
+    `;
+        const variables = {
+            input: {
+                environmentId: environmentId,
+                mountPath: volume.path,
+                serviceId: volume.svc_id,
+                projectId: PROJECT_ID$1
+            }
+        };
+        const createdVolume = await railwayGraphQLRequest(query, variables, 'CREATE_VOLUME');
+        if (!createdVolume) {
+            console.error('Failed to create volume');
+        }
+    }
+    catch (error) {
+        console.error('An error occurred during the volume creation:', error);
+    }
+}
+async function createVolumes(environmentId, volumes) {
+    try {
+        // Create an array of promises
+        const createPromises = volumes.map((volume) => createVolume(environmentId, volume));
+        // Await all promises
+        await Promise.all(createPromises);
+        console.log('All volumes created successfully.');
+    }
+    catch (error) {
+        console.error('An error occurred during the creation:', error);
+    }
+}
 async function updateEnvironmentVariablesForServices(environmentId, serviceInstances, ENV_VARS) {
     const serviceIds = [];
     // Extract service IDs
@@ -38881,6 +38924,7 @@ const ENV_VARS = coreExports.getInput('ENV_VARS');
 const API_SERVICE_NAME = coreExports.getInput('API_SERVICE_NAME');
 const DEPLOYMENT_ORDER = coreExports.getInput('DEPLOYMENT_ORDER');
 const IGNORE_SERVICE_REDEPLOY = coreExports.getInput('IGNORE_SERVICE_REDEPLOY');
+const VOLUMES = coreExports.getInput('VOLUMES');
 async function runCreate() {
     if (!SRC_ENVIRONMENT_NAME || !PROJECT_ID) {
         console.log('SRC_ENVIRONMENT_NAME and PROJECT_ID are required when creating a new environment');
@@ -38939,13 +38983,27 @@ async function runCreate() {
         });
         const allServices = await Promise.all(servicePromises);
         let servicesToDeploy = allServices.filter((s) => !servicesToIgnore.includes(s.name));
+        const volumes = JSON.parse(VOLUMES);
+        const volumesToCreate = volumes.map((volume) => {
+            const svc_id = servicesToDeploy.find((s) => s.name === volume.svc_name)?.id;
+            if (!svc_id) {
+                throw new Error(`Volume Creation: Service ${volume.svc_name} not found in the environment`);
+            }
+            return {
+                ...volume,
+                svc_id
+            };
+        });
+        if (volumesToCreate.length > 0) {
+            await createVolumes(environmentId, volumesToCreate);
+        }
         const enforceOrder = deploymentOrder && deploymentOrder.length > 0;
         // if deployment order is specified get the services in the correct order
         if (enforceOrder) {
             servicesToDeploy = deploymentOrder.map((name) => {
                 const service = servicesToDeploy.find((s) => s.name.toLowerCase() === name.toLocaleLowerCase());
                 if (!service) {
-                    throw new Error(`Service ${name} not found in the environment`);
+                    throw new Error(`Deployment Order: Service ${name} not found in the environment`);
                 }
                 return service;
             });

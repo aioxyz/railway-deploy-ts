@@ -75,6 +75,12 @@ inputs:
       deployment."
     required: false
     default: '[]'
+  VOLUMES:
+    description:
+      'The volumes to create for the PR environment. Should be a JSON array of
+      volume configs. e.g. [{path: "/path/to/volume", svc_name: "service1"}]'
+    required: false
+    default: '[]'
 outputs:
   service_domain:
     description: 'The domain of the deployed PR environment'

@@ -542,7 +542,8 @@ export async function createEnvironment(sourceEnvironmentId: string) {
         name: DEST_ENV_NAME,
         projectId: PROJECT_ID,
         skipInitialDeploys: true,
-        sourceEnvironmentId: sourceEnvironmentId
+        sourceEnvironmentId: sourceEnvironmentId,
+        ephemeral: true
       }
     }
     const createdEnvironment = await railwayGraphQLRequest(
@@ -668,6 +669,61 @@ export async function updateAllDeploymentTriggers(
     console.log('All deployment triggers updated successfully.')
   } catch (error) {
     console.error('An error occurred during the update:', error)
+  }
+}
+
+async function createVolume(
+  environmentId: string,
+  volume: { path: string; svc_name: string; svc_id: string }
+) {
+  console.log('Creating Volume for service: ', volume.svc_name)
+  try {
+    const query = gql`
+      mutation volumeCreate($input: VolumeCreateInput!) {
+        volumeCreate(input: $input) {
+          environmentId
+          projectId
+          mountPath
+          serviceId
+        }
+      }
+    `
+    const variables = {
+      input: {
+        environmentId: environmentId,
+        mountPath: volume.path,
+        serviceId: volume.svc_id,
+        projectId: PROJECT_ID
+      }
+    }
+    const createdVolume = await railwayGraphQLRequest(
+      query,
+      variables,
+      'CREATE_VOLUME'
+    )
+    if (!createdVolume) {
+      console.error('Failed to create volume')
+    }
+  } catch (error) {
+    console.error('An error occurred during the volume creation:', error)
+  }
+}
+
+export async function createVolumes(
+  environmentId: string,
+  volumes: { path: string; svc_name: string; svc_id: string }[]
+) {
+  try {
+    // Create an array of promises
+    const createPromises = volumes.map((volume) =>
+      createVolume(environmentId, volume)
+    )
+
+    // Await all promises
+    await Promise.all(createPromises)
+    console.log('All volumes created successfully.')
+  } catch (error) {
+    console.error('An error occurred during the creation:', error)
   }
 }
 

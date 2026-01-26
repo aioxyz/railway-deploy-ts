@@ -8,7 +8,8 @@ import {
   getService,
   deployAllServices,
   deleteEnvironment,
-  serviceConnect
+  serviceConnect,
+  createVolumes
 } from './railway.js'
 
 const MODE = core.getInput('MODE')
@@ -22,6 +23,7 @@ const ENV_VARS = core.getInput('ENV_VARS')
 const API_SERVICE_NAME = core.getInput('API_SERVICE_NAME')
 const DEPLOYMENT_ORDER = core.getInput('DEPLOYMENT_ORDER')
 const IGNORE_SERVICE_REDEPLOY = core.getInput('IGNORE_SERVICE_REDEPLOY')
+const VOLUMES = core.getInput('VOLUMES')
 
 async function runCreate(): Promise<void> {
   if (!SRC_ENVIRONMENT_NAME || !PROJECT_ID) {
@@ -119,6 +121,31 @@ async function runCreate(): Promise<void> {
         (s: { name: string; id: string }) => !servicesToIgnore.includes(s.name)
       )
 
+    const volumes = JSON.parse(VOLUMES) as {
+      svc_name: string
+      path: string
+    }[]
+    const volumesToCreate = volumes.map((volume) => {
+      const svc_id = servicesToDeploy.find(
+        (s) => s.name === volume.svc_name
+      )?.id
+
+      if (!svc_id) {
+        throw new Error(
+          `Volume Creation: Service ${volume.svc_name} not found in the environment`
+        )
+      }
+
+      return {
+        ...volume,
+        svc_id
+      }
+    })
+
+    if (volumesToCreate.length > 0) {
+      await createVolumes(environmentId, volumesToCreate)
+    }
+
     const enforceOrder = deploymentOrder && deploymentOrder.length > 0
 
     // if deployment order is specified get the services in the correct order
@@ -128,7 +155,9 @@ async function runCreate(): Promise<void> {
           (s) => s.name.toLowerCase() === name.toLocaleLowerCase()
         )
         if (!service) {
-          throw new Error(`Service ${name} not found in the environment`)
+          throw new Error(
+            `Deployment Order: Service ${name} not found in the environment`
+          )
         }
         return service
       })
