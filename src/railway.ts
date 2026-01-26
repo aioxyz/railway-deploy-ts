@@ -681,10 +681,8 @@ async function createVolume(
     const query = gql`
       mutation volumeCreate($input: VolumeCreateInput!) {
         volumeCreate(input: $input) {
-          environmentId
-          projectId
-          mountPath
-          serviceId
+          id
+          name
         }
       }
     `
