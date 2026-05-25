@@ -33,113 +33,81 @@ async function runCreate(): Promise<void> {
     core.setFailed('Environment creation aborted')
   }
   try {
-    // Get Environments to check if the environment already exists
-    const response = await getEnvironments()
+    const environments = await getEnvironments()
 
-    // Filter the response to only include the environment name we are looking to create
-    const filteredEdges = response.environments.edges.filter(
-      (edge: any) => edge.node.name === DEST_ENV_NAME
-    )
-
-    // If there is a match this means the environment already exists
-    if (filteredEdges.length == 1) {
+    const existing = environments.find((e: any) => e.name === DEST_ENV_NAME)
+    if (existing) {
       throw new Error(
         'Environment already exists. Please delete the environment via API or Railway Dashboard and try again.'
       )
     }
 
     let srcEnvironmentId = SRC_ENVIRONMENT_ID
-
-    // If no source ENV_ID provided get Source Environment ID to base new PR environment from (aka use the same environment variables)
     if (!SRC_ENVIRONMENT_ID) {
-      srcEnvironmentId = response.environments.edges.filter(
-        (edge) => edge.node.name === SRC_ENVIRONMENT_NAME
-      )[0].node.id
+      const src = environments.find((e: any) => e.name === SRC_ENVIRONMENT_NAME)
+      if (!src)
+        throw new Error(
+          `Source environment "${SRC_ENVIRONMENT_NAME}" not found`
+        )
+      srcEnvironmentId = src.id
     }
 
-    // Create the new Environment based on the Source Environment
     const createdEnvironment = await createEnvironment(srcEnvironmentId)
 
     console.log('Created Environment:')
     console.dir(createdEnvironment, { depth: null })
 
-    const { id: environmentId } = createdEnvironment.environmentCreate
+    const env = createdEnvironment.environmentCreate
+
+    const { id: environmentId } = env
 
     // Get all the Deployment Triggers
     const deploymentTriggerIds: string[] = []
-    for (const deploymentTrigger of createdEnvironment.environmentCreate
-      .deploymentTriggers.edges) {
+    for (const deploymentTrigger of env.deploymentTriggers.edges) {
       const { id: deploymentTriggerId } = deploymentTrigger.node
       deploymentTriggerIds.push(deploymentTriggerId)
     }
 
-    // Get all the Service Instances
-    const { serviceInstances } = createdEnvironment.environmentCreate
+    const { serviceInstances } = env
 
-    // Update the Environment Variables on each Service Instance
-    // TODO: ONLY ADD ENV_VARS to its corresponding service
     await updateEnvironmentVariablesForServices(
       environmentId,
       serviceInstances,
       ENV_VARS
     )
 
-    // // Wait for the created environment to finish initializing
-    // console.log(
-    //   'Waiting 15 seconds for deployment to initialize and become available'
-    // )
-    // await new Promise((resolve) => setTimeout(resolve, 15000)) // Wait for 15 seconds
-
-    // Set the Deployment Trigger Branch for Each Service
     await updateAllDeploymentTriggers(deploymentTriggerIds)
 
     const servicesToIgnore = JSON.parse(IGNORE_SERVICE_REDEPLOY)
     const deploymentOrder: string[] = JSON.parse(DEPLOYMENT_ORDER)
+
     const servicePromises: Promise<{
       id: string
       name: string
       domains: any
-    }>[] = createdEnvironment.environmentCreate.serviceInstances.edges.map(
-      async (serviceInstance: any) => {
-        const id = serviceInstance.node.serviceId
-        const { domains } = serviceInstance.node
-        const { service } = await getService(id)
-        const { name } = service
-
-        return {
-          name,
-          id,
-          domains
-        }
-      }
-    )
+    }>[] = serviceInstances.edges.map(async (si: any) => {
+      const { domains, serviceId } = si.node
+      const { service } = await getService(serviceId)
+      const { name } = service
+      return { name, id: serviceId, domains }
+    })
 
     const allServices = await Promise.all(servicePromises)
 
     let servicesToDeploy: { id: string; name: string; domains: any }[] =
-      allServices.filter(
-        (s: { name: string; id: string }) => !servicesToIgnore.includes(s.name)
-      )
+      allServices.filter((s) => !servicesToIgnore.includes(s.name))
 
-    const volumes = JSON.parse(VOLUMES) as {
-      svc_name: string
-      path: string
-    }[]
+    const volumes = JSON.parse(VOLUMES) as { svc_name: string; path: string }[]
     const volumesToCreate = volumes.map((volume) => {
       const svc_id = servicesToDeploy.find(
         (s) => s.name === volume.svc_name
       )?.id
-
       if (!svc_id) {
         throw new Error(
           `Volume Creation: Service ${volume.svc_name} not found in the environment`
         )
       }
-
-      return {
-        ...volume,
-        svc_id
-      }
+      return { ...volume, svc_id }
     })
 
     if (volumesToCreate.length > 0) {
@@ -148,7 +116,6 @@ async function runCreate(): Promise<void> {
 
     const enforceOrder = deploymentOrder && deploymentOrder.length > 0
 
-    // if deployment order is specified get the services in the correct order
     if (enforceOrder) {
       servicesToDeploy = deploymentOrder.map((name) => {
         const service = servicesToDeploy.find(
@@ -171,79 +138,36 @@ async function runCreate(): Promise<void> {
         name === 'backend' ||
         name === 'web'
       ) {
-        const domainData = domains.serviceDomains?.[0]
+        const domainData = domains?.serviceDomains?.[0]
         if (domainData) {
           const { domain } = domainData
           console.log('Domain:', domain)
           core.setOutput('service_domain', domain)
         } else {
           console.log('Domain data is undefined')
-          // Handle the case where serviceDomains is undefined
         }
       }
     }
 
-    // Get the names for each deployed service
-    // for (const service of servicesToDeploy) {
-    //   const { domains } = serviceInstance.node
-    //   const { service } = await getService(serviceInstance.node.serviceId)
-    //   const { name } = service
-
-    //   if (!servicesToIgnore.includes(name)) {
-    //     servicesToDeploy.push(serviceInstance.node.serviceId)
-    //   }
-
-    //   if (deploymentOrder && deploymentOrder.length > 0) {
-    //     if (deploymentOrder.includes(name)) {
-    //     }
-    //   }
-
-    //   if (
-    //     (API_SERVICE_NAME && name === API_SERVICE_NAME) ||
-    //     name === 'app' ||
-    //     name === 'backend' ||
-    //     name === 'web'
-    //   ) {
-    //     const domainData = domains.serviceDomains?.[0]
-    //     if (domainData) {
-    //       const { domain } = domainData
-    //       console.log('Domain:', domain)
-    //       core.setOutput('service_domain', domain)
-    //     } else {
-    //       console.log('Domain data is undefined')
-    //       // Handle the case where serviceDomains is undefined
-    //     }
-    //   }
-    // }
-
-    // Redeploy the Services
     await deployAllServices(environmentId, servicesToDeploy, enforceOrder)
   } catch (error) {
     console.error('Error in runCreate:', error)
-    // Handle the error, e.g., fail the action
     core.setFailed('Environment creation failed')
   }
 }
 
 async function runDestroy(): Promise<void> {
   try {
-    const response = await getEnvironments()
+    const environments = await getEnvironments()
 
-    // Filter the response to only include the environment name we are looking to create
-    const filteredEdges = response.environments.edges.filter(
-      (edge: any) => edge.node.name === DEST_ENV_NAME
-    )
-
-    // If there is a match this means the environment already exists
-    if (filteredEdges.length == 1) {
-      const environmentId = filteredEdges[0].node.id
-      await deleteEnvironment(environmentId)
-    } else {
-      throw new Error('Environment does not exists. Cannot delete.')
+    const target = environments.find((e: any) => e.name === DEST_ENV_NAME)
+    if (!target) {
+      throw new Error('Environment does not exist. Cannot delete.')
     }
+
+    await deleteEnvironment(target.id)
   } catch (error) {
     console.error('Error in runDestroy:', error)
-    // Handle the error, e.g., fail the action
     core.setFailed('Environment destruction failed')
   }
 }
@@ -257,7 +181,6 @@ async function runConnect(): Promise<void> {
     await serviceConnect(SRC_IMG, SVC_ID)
   } catch (error) {
     console.error('Error in runConnect:', error)
-    // Handle the error, e.g., fail the action
     core.setFailed('Service Connect Failed')
   }
 }
