@@ -6,9 +6,12 @@
     "declarationMap": false,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "lib": ["ES2022"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "newLine": "lf",
     "noImplicitAny": false,
     "noUnusedLocals": true,
@@ -17,6 +20,6 @@
     "resolveJsonModule": true,
     "strict": true,
     "strictNullChecks": true,
-    "target": "ES2022"
+    "target": "esnext"
   }
 }

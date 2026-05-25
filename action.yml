@@ -85,5 +85,5 @@ outputs:
   service_domain:
     description: 'The domain of the deployed PR environment'
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'dist/index.js'
